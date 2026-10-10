@@ -37,7 +37,7 @@ import FilaOrdensBloqueadas from './components/FilaOrdensBloqueadas';
 import DashboardDRE from './components/DashboardDRE';
 import RelatoriosHub from './pages/reports/RelatoriosHub';
 import { maskCNPJ, maskPhone, maskCEP, maskIE } from './utils/maskHelper';
-import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles } from 'lucide-react';
+import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles, Menu, X, LogOut } from 'lucide-react';
 
 
 
@@ -46,6 +46,8 @@ function App() {
   const [activeTab, setActiveTab] = useState('grid');
   const [selectedOSIdForModal, setSelectedOSIdForModal] = useState(null);
   const [toast, setToast] = useState(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [mobileExpandedGroup, setMobileExpandedGroup] = useState('estoque');
 
 
 
@@ -319,24 +321,26 @@ function App() {
         />
       )}
       {/* Cabeçalho Premium */}
-      <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      <header className="app-header">
+        <div className="header-brand-section" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className="logo-container" onClick={handleOpenLabModal} style={{ cursor: 'pointer' }} title="Clique para editar dados do laboratório">
             <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'hsl(var(--text-primary))', display: 'flex', alignItems: 'center', gap: '8px' }}>
               {laboratory.name.split(' ')[0]}<span style={{ color: 'hsl(var(--secondary))' }}>{laboratory.name.split(' ').slice(1).join(' ') || ''}</span>
             </span>
             <span className="logo-badge">Fábrica</span>
           </div>
-          {/* Pesquisa Global */}
-          <GlobalSearch onNavigate={(tab, result) => {
-            if (tab) setActiveTab(tab);
-            if (result && result.type === 'os' && result.id) {
-              setSelectedOSIdForModal(result.id);
-            }
-          }} />
+          {/* Pesquisa Global Desktop */}
+          <div className="desktop-search-wrapper">
+            <GlobalSearch onNavigate={(tab, result) => {
+              if (tab) setActiveTab(tab);
+              if (result && result.type === 'os' && result.id) {
+                setSelectedOSIdForModal(result.id);
+              }
+            }} />
+          </div>
         </div>
 
-        <nav className="nav-tabs" style={{ gap: '15px', background: 'transparent', border: 'none', boxShadow: 'none', overflow: 'visible' }}>
+        <nav className="nav-tabs nav-desktop-tabs" style={{ gap: '15px', background: 'transparent', border: 'none', boxShadow: 'none', overflow: 'visible' }}>
 
 
 
@@ -591,8 +595,8 @@ function App() {
 
         </nav>
 
-        {/* Informações do usuário logado */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', paddingRight: '20px' }}>
+        {/* Informações do usuário logado (Desktop) */}
+        <div className="user-desktop-info" style={{ display: 'flex', alignItems: 'center', gap: '15px', paddingRight: '20px' }}>
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'hsl(var(--text-primary))', display: 'block' }}>{currentUser.name}</span>
             <span style={{ fontSize: '0.7rem', color: 'hsl(var(--secondary))', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>{currentUser.role}</span>
@@ -612,7 +616,228 @@ function App() {
             Sair
           </button>
         </div>
+
+        {/* Botão Mobile Hamburguer (Apenas mobile/tablet) */}
+        <div className="mobile-header-actions">
+          <button 
+            type="button" 
+            className="mobile-hamburger-btn" 
+            onClick={() => setMobileDrawerOpen(true)}
+            aria-label="Abrir menu mobile"
+          >
+            <Menu size={24} />
+          </button>
+        </div>
       </header>
+
+      {/* Barra de Pesquisa Rápida Mobile */}
+      <div className="mobile-search-bar">
+        <GlobalSearch onNavigate={(tab, result) => {
+          if (tab) setActiveTab(tab);
+          if (result && result.type === 'os' && result.id) {
+            setSelectedOSIdForModal(result.id);
+          }
+        }} />
+      </div>
+
+      {/* Drawer Lateral Mobile */}
+      {mobileDrawerOpen && (
+        <div className="mobile-drawer-overlay" onClick={() => setMobileDrawerOpen(false)}>
+          <aside className="mobile-drawer" onClick={(e) => e.stopPropagation()}>
+            {/* Topo do Drawer */}
+            <div className="mobile-drawer-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'hsl(var(--text-primary))' }}>
+                  {laboratory.name.split(' ')[0]} <span style={{ color: 'hsl(var(--secondary))' }}>{laboratory.name.split(' ').slice(1).join(' ') || ''}</span>
+                </span>
+                <span className="logo-badge" style={{ fontSize: '0.65rem' }}>Fábrica</span>
+              </div>
+              <button 
+                type="button" 
+                className="mobile-drawer-close"
+                onClick={() => setMobileDrawerOpen(false)}
+                aria-label="Fechar menu"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Usuário Logado */}
+            <div className="mobile-drawer-user">
+              <div className="mobile-drawer-user-avatar">
+                {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <span className="mobile-drawer-user-name">{currentUser.name}</span>
+                <span className="mobile-drawer-user-role">{currentUser.role}</span>
+              </div>
+            </div>
+
+            {/* Grupos de Navegação Mobile */}
+            <nav className="mobile-drawer-nav">
+              {/* Grupo 1: Estoque & Grade */}
+              <div className="mobile-nav-group">
+                <button 
+                  type="button" 
+                  className={`mobile-nav-group-title ${['scanner', 'grid', 'grid-blocos', 'grid-167', 'grid-multifocal-acabado', 'matriz-visao-simples', 'nfe', 'alerts', 'admin-lentes', 'unified-lens-register'].includes(activeTab) ? 'active' : ''}`}
+                  onClick={() => setMobileExpandedGroup(mobileExpandedGroup === 'estoque' ? null : 'estoque')}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Layers size={18} /> Estoque & Grade</span>
+                  <ChevronDown size={16} style={{ transform: mobileExpandedGroup === 'estoque' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {mobileExpandedGroup === 'estoque' && (
+                  <div className="mobile-nav-subitems">
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'unified-lens-register' || activeTab === 'scanner' ? 'active' : ''}`} onClick={() => { setActiveTab('unified-lens-register'); setMobileDrawerOpen(false); }}>
+                      <Plus size={16} /> Cadastrador Unificado & Bipador
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'grid' ? 'active' : ''}`} onClick={() => { setActiveTab('grid'); setMobileDrawerOpen(false); }}>
+                      <Grid size={16} /> Visão Simples LP
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'grid-167' ? 'active' : ''}`} onClick={() => { setActiveTab('grid-167'); setMobileDrawerOpen(false); }}>
+                      <Sparkles size={16} style={{ color: '#a855f7' }} /> 1.67 Lentes Prontas
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'grid-multifocal-acabado' ? 'active' : ''}`} onClick={() => { setActiveTab('grid-multifocal-acabado'); setMobileDrawerOpen(false); }}>
+                      <Sparkles size={16} style={{ color: '#06b6d4' }} /> Multifocal Acabado
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'grid-blocos' ? 'active' : ''}`} onClick={() => { setActiveTab('grid-blocos'); setMobileDrawerOpen(false); }}>
+                      <Layers size={16} /> Multifocal
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'matriz-visao-simples' ? 'active' : ''}`} onClick={() => { setActiveTab('matriz-visao-simples'); setMobileDrawerOpen(false); }}>
+                      <Layers size={16} style={{ color: 'hsl(var(--secondary))' }} /> Bloco Visão Simples
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'nfe' ? 'active' : ''}`} onClick={() => { setActiveTab('nfe'); setMobileDrawerOpen(false); }}>
+                      <FileUp size={16} /> Importar NF-e
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => { setActiveTab('alerts'); setMobileDrawerOpen(false); }}>
+                      <ShieldAlert size={16} /> Motor Preditivo
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Grupo 2: Bancada OS */}
+              <div className="mobile-nav-group">
+                <button 
+                  type="button" 
+                  className={`mobile-nav-group-title ${['os-upload', 'os-workflow', 'os-dashboard', 'os-factory-register', 'financial-blocked-orders'].includes(activeTab) ? 'active' : ''}`}
+                  onClick={() => setMobileExpandedGroup(mobileExpandedGroup === 'os' ? null : 'os')}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Activity size={18} /> Bancada OS</span>
+                  <ChevronDown size={16} style={{ transform: mobileExpandedGroup === 'os' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {mobileExpandedGroup === 'os' && (
+                  <div className="mobile-nav-subitems">
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'os-factory-register' || activeTab === 'os-upload' ? 'active' : ''}`} onClick={() => { setActiveTab('os-factory-register'); setMobileDrawerOpen(false); }}>
+                      <Plus size={16} /> Nova OS de Fábrica
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'os-workflow' ? 'active' : ''}`} onClick={() => { setActiveTab('os-workflow'); setMobileDrawerOpen(false); }}>
+                      <Activity size={16} /> Bancada OS
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'os-dashboard' ? 'active' : ''}`} onClick={() => { setActiveTab('os-dashboard'); setMobileDrawerOpen(false); }}>
+                      <BarChart2 size={16} /> Indicadores
+                    </button>
+                    {currentUser.role === 'Administrador' && (
+                      <button type="button" className={`mobile-nav-item ${activeTab === 'financial-blocked-orders' ? 'active' : ''}`} onClick={() => { setActiveTab('financial-blocked-orders'); setMobileDrawerOpen(false); }}>
+                        <Lock size={16} /> Ordens Retidas
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Grupo 3: Comercial & Finanças */}
+              <div className="mobile-nav-group">
+                <button 
+                  type="button" 
+                  className={`mobile-nav-group-title ${['crm-pipeline', 'catalog', 'price-tables', 'billing', 'dashboard-gerencial', 'supplier-orders', 'dre-consolidado', 'executive-dashboard', 'finance-corp'].includes(activeTab) ? 'active' : ''}`}
+                  onClick={() => setMobileExpandedGroup(mobileExpandedGroup === 'comercial' ? null : 'comercial')}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><DollarSign size={18} /> Comercial & Finanças</span>
+                  <ChevronDown size={16} style={{ transform: mobileExpandedGroup === 'comercial' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {mobileExpandedGroup === 'comercial' && (
+                  <div className="mobile-nav-subitems">
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'catalog' ? 'active' : ''}`} onClick={() => { setActiveTab('catalog'); setMobileDrawerOpen(false); }}>
+                      <DollarSign size={16} /> Catálogo Financeiro
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'price-tables' ? 'active' : ''}`} onClick={() => { setActiveTab('price-tables'); setMobileDrawerOpen(false); }}>
+                      <Percent size={16} /> Tabela de Preços
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'billing' ? 'active' : ''}`} onClick={() => { setActiveTab('billing'); setMobileDrawerOpen(false); }}>
+                      <DollarSign size={16} /> Financeiro (Fechamento)
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'supplier-orders' ? 'active' : ''}`} onClick={() => { setActiveTab('supplier-orders'); setMobileDrawerOpen(false); }}>
+                      <DollarSign size={16} /> Pedidos Fornecedor
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'dashboard-gerencial' ? 'active' : ''}`} onClick={() => { setActiveTab('dashboard-gerencial'); setMobileDrawerOpen(false); }}>
+                      <TrendingUp size={16} /> Dashboard Gerencial
+                    </button>
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'dre-consolidado' ? 'active' : ''}`} onClick={() => { setActiveTab('dre-consolidado'); setMobileDrawerOpen(false); }}>
+                      <BarChart3 size={16} style={{ color: '#22c55e' }} /> DRE Consolidado
+                    </button>
+                    {currentUser.role === 'Administrador' && (
+                      <button type="button" className={`mobile-nav-item ${['executive-dashboard', 'finance-corp'].includes(activeTab) ? 'active' : ''}`} onClick={() => { setActiveTab('executive-dashboard'); setMobileDrawerOpen(false); }}>
+                        <BarChart3 size={16} /> Dashboard Executivo
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Grupo 4: Relatórios & BI */}
+              <div className="mobile-nav-group">
+                <button 
+                  type="button" 
+                  className={`mobile-nav-group-title ${activeTab === 'relatorios-bi' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('relatorios-bi'); setMobileDrawerOpen(false); }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><BarChart3 size={18} style={{ color: '#38bdf8' }} /> Relatórios & BI</span>
+                </button>
+              </div>
+
+              {/* Grupo 5: Sistema */}
+              <div className="mobile-nav-group">
+                <button 
+                  type="button" 
+                  className={`mobile-nav-group-title ${['admin-users', 'cadastro-oticas', 'system-parameters'].includes(activeTab) ? 'active' : ''}`}
+                  onClick={() => setMobileExpandedGroup(mobileExpandedGroup === 'sistema' ? null : 'sistema')}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Settings size={18} /> Sistema</span>
+                  <ChevronDown size={16} style={{ transform: mobileExpandedGroup === 'sistema' ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {mobileExpandedGroup === 'sistema' && (
+                  <div className="mobile-nav-subitems">
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'cadastro-oticas' ? 'active' : ''}`} onClick={() => { setActiveTab('cadastro-oticas'); setMobileDrawerOpen(false); }}>
+                      <Store size={16} /> Cadastro Óticas
+                    </button>
+                    {currentUser.role === 'Administrador' && (
+                      <>
+                        <button type="button" className={`mobile-nav-item ${activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => { setActiveTab('admin-users'); setMobileDrawerOpen(false); }}>
+                          <Users size={16} /> Gerenciar Usuários
+                        </button>
+                        <button type="button" className={`mobile-nav-item ${activeTab === 'system-parameters' ? 'active' : ''}`} onClick={() => { setActiveTab('system-parameters'); setMobileDrawerOpen(false); }}>
+                          <Settings size={16} /> Parâmetros do Sistema
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </nav>
+
+            {/* Rodapé do Drawer: Logout */}
+            <div className="mobile-drawer-footer">
+              <button 
+                type="button"
+                className="mobile-drawer-logout-btn"
+                onClick={() => { setMobileDrawerOpen(false); handleLogout(); }}
+              >
+                <LogOut size={18} /> Sair do Sistema
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
 
       {/* Barra de Menu Inteligente: Favoritos + Recentes */}
       <SmartMenuBar

@@ -104,12 +104,11 @@ body {
   z-index: 160;
 }
 
-@media (max-width: 768px) {
-  .app-header {
-    padding: 15px 20px;
-    flex-direction: column;
-    gap: 15px;
-  }
+/* Oculta controles mobile no Desktop */
+.mobile-header-actions,
+.mobile-search-bar,
+.mobile-drawer-overlay {
+  display: none !important;
 }
 
 .logo-container {
@@ -1532,6 +1531,355 @@ input[type=number] {
   @page {
     size: A4 portrait;
     margin: 12mm;
+  }
+}
+
+/* ==========================================================================
+   OTIMIZAÇÃO MOBILE & TABLET (SEM ALTERAR O VISUAL DESKTOP)
+   ========================================================================== */
+
+/* Botão Hamburguer no Header */
+.mobile-hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  border-radius: 10px;
+  color: hsl(var(--text-primary));
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.mobile-hamburger-btn:active {
+  transform: scale(0.95);
+  background: #f1f5f9;
+}
+
+/* Barra de Pesquisa Rápida Mobile */
+.mobile-search-bar {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mobile-search-bar .global-search {
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Drawer Lateral Mobile */
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeInOverlay 0.25s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mobile-drawer {
+  width: min(340px, 86vw);
+  height: 100%;
+  background: #ffffff;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: slideDrawer 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes slideDrawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.mobile-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.mobile-drawer-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobile-drawer-close:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.mobile-drawer-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(99, 102, 241, 0.08));
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mobile-drawer-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.mobile-drawer-user-name {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-drawer-user-role {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0284c7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mobile-drawer-nav {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-nav-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.mobile-nav-group-title {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: none;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e293b;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mobile-nav-group-title.active {
+  color: #0284c7;
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.mobile-nav-subitems {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
+}
+
+.mobile-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.mobile-nav-item:active,
+.mobile-nav-item.active {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+  font-weight: 700;
+}
+
+.mobile-drawer-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.mobile-drawer-logout-btn {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.mobile-drawer-logout-btn:active {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================================================
+   BREAKPOINTS RESPONSIVOS (TABLETS E CELULARES)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  /* Oculta navegação e perfil desktop */
+  .nav-desktop-tabs {
+    display: none !important;
+  }
+
+  .user-desktop-info {
+    display: none !important;
+  }
+
+  .desktop-search-wrapper {
+    display: none !important;
+  }
+
+  /* Exibe controles mobile */
+  .mobile-header-actions {
+    display: flex !important;
+    align-items: center;
+  }
+
+  .mobile-search-bar {
+    display: block !important;
+  }
+
+  .mobile-drawer-overlay {
+    display: flex !important;
+  }
+
+  /* Cabeçalho compacto e sem quebra */
+  .app-header {
+    padding: 12px 18px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .header-brand-section {
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Container principal com margens adequadas para telas pequenas */
+  .app-container {
+    padding: 12px 10px !important;
+    gap: 16px !important;
+  }
+
+  /* Previne zoom automático indesejado no iOS */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Barra de Favoritos / Recentes com rolagem horizontal de toque suave */
+  .smart-menu-bar {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Tabelas de dados e grades com rolagem touch sem quebrar a largura da tela */
+  table {
+    display: block !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .table-responsive,
+  .table-container,
+  .grid-container,
+  .matriz-container,
+  .diopter-matrix {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Modais ocupando até 95% da tela no celular para total usabilidade */
+  .modal-content,
+  .modal-box,
+  .dialog-content,
+  .glass-modal,
+  [role="dialog"] > div {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    margin: 10px auto !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Empilhamento responsivo de cards e KPIs */
+  .stats-grid,
+  .kpi-grid,
+  .dashboard-grid,
+  .cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+    gap: 12px !important;
   }
 }
 
