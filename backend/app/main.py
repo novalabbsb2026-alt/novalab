@@ -42,6 +42,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()}
+    )
+
 @app.get("/db-health")
 async def db_health():
     try:
@@ -49,7 +59,7 @@ async def db_health():
             res = await conn.execute(text("SELECT version();"))
             row = res.scalar()
         masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "SEM_ARROBA"
-        return {"status": "ok", "db_version": str(row), "host": masked}
+        return {"status": "ok", "db_version": str(row), "host": masked, "version": "v1.0.3-dbg"}
     except Exception as e:
         import traceback
         masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "SEM_ARROBA"
