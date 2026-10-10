@@ -1,3 +1,14 @@
+import sys
+import os
+
+# Garante que o diretório raiz e o backend estejam no sys.path para compatibilidade com nuvem
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_backend_dir = os.path.dirname(_current_dir)
+_project_root = os.path.dirname(_backend_dir)
+for _p in [_project_root, _backend_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import asyncio
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
