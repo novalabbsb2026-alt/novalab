@@ -628,7 +628,7 @@ async def get_receivables_kpis(db: AsyncSession) -> Dict[str, Any]:
     """
     Calcula estatísticas de Contas a Receber: total pago, pendente e inadimplente (atrasado).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     # Faturas pagas
     paid_query = select(func.sum(BillingCycle.total_amount), func.count(BillingCycle.id)).where(BillingCycle.status == "PAGO")

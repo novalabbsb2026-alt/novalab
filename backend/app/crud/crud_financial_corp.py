@@ -472,11 +472,16 @@ async def get_consolidated_dre(db: AsyncSession, start_date: Optional[datetime] 
     """
     await sync_billing_cycles_to_receivables(db)
     
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     if not start_date:
         start_date = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif getattr(start_date, 'tzinfo', None) is not None:
+        start_date = start_date.replace(tzinfo=None)
+        
     if not end_date:
         end_date = now_utc
+    elif getattr(end_date, 'tzinfo', None) is not None:
+        end_date = end_date.replace(tzinfo=None)
         
     # 1. Faturamento Bruto (Receitas faturadas/recebidas no período)
     rec_stmt = select(func.sum(AccountsReceivable.amount)).where(

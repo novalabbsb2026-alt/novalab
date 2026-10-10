@@ -81,7 +81,7 @@ async def get_manager_dashboard_data(db: AsyncSession) -> Dict[str, Any]:
     Consolida as métricas gerenciais dos pilares Comercial, Produção e Estoque
     para o Dashboard do administrador.
     """
-    limite_30_dias = datetime.now(timezone.utc) - timedelta(days=30)
+    limite_30_dias = (datetime.now(timezone.utc) - timedelta(days=30)).replace(tzinfo=None)
     
     # --- 1. INDICADORES COMERCIAIS ---
     # Faturamento Total Geral
