@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import api, { LensService, OSService } from '../services/api';
+import api, { LensService, OSService, getBaseUrl, getWsUrl } from '../services/api';
 
 import { Play, Check, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Info, DollarSign, History, User, Clock, MapPin, ClipboardList, Trash2, Barcode, Camera, Keyboard, CheckCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -46,11 +46,6 @@ const OSWorkflow = () => {
   const [showingCancelModal, setShowingCancelModal] = useState(false);
   const [cancelOsId, setCancelOsId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
-
-  const getBaseUrl = () => {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:8000/api/v1`;
-  };
 
   const handleOpenCancelModal = (osId) => {
     setCancelOsId(osId);
@@ -188,8 +183,7 @@ const OSWorkflow = () => {
 
   // WebSocket real-time updates listener
   useEffect(() => {
-    const hostname = window.location.hostname;
-    const ws = new WebSocket(`ws://${hostname}:8000/ws`);
+    const ws = new WebSocket(getWsUrl());
 
     ws.onmessage = (event) => {
       try {

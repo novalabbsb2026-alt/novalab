@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Check, AlertTriangle, RefreshCw, FileText, Sparkles, HelpCircle } from 'lucide-react';
-import { OSService } from '../services/api';
+import { OSService, getBaseUrl } from '../services/api';
 import axios from 'axios';
 
 const OCRValidationView = ({ file, opticalStoreId, onCancel, onConfirm }) => {
@@ -41,11 +41,6 @@ const OCRValidationView = ({ file, opticalStoreId, onCancel, onConfirm }) => {
 
   const [models, setModels] = useState([]);
   const [saving, setSaving] = useState(false);
-
-  const getBaseUrl = () => {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:8000/api/v1`;
-  };
 
   useEffect(() => {
     if (file) {

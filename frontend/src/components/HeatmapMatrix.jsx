@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { LensService } from '../services/api';
+import { LensService, getBaseUrl } from '../services/api';
 import { Flame, Eye, EyeOff, Layers } from 'lucide-react';
 
 const HeatmapMatrix = ({ refreshTrigger }) => {
@@ -11,11 +11,6 @@ const HeatmapMatrix = ({ refreshTrigger }) => {
   const [showFullGrid, setShowFullGrid] = useState(false);
   const [hoveredCell, setHoveredCell] = useState(null);
   const [signFilter, setSignFilter] = useState('negative');
-
-  const getBaseUrl = () => {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:8000/api/v1`;
-  };
 
   useEffect(() => {
     loadBrands();

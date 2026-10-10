@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Layers, RefreshCw, DollarSign, AlertCircle, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
-import { OSService, ProductService, TreatmentService, TechnicalServiceService, CustomerPriceService } from '../services/api';
+import { OSService, ProductService, TreatmentService, TechnicalServiceService, CustomerPriceService, getBaseUrl } from '../services/api';
 
 const GerenciadorItensOS = ({ osId, opticalStoreId, onItemsUpdated }) => {
   const [items, setItems] = useState([]);
@@ -186,9 +186,8 @@ const GerenciadorItensOS = ({ osId, opticalStoreId, onItemsUpdated }) => {
     }
     setAuthenticating(true);
     setAuthError('');
-    const hostname = window.location.hostname;
     try {
-      const response = await axios.post(`http://${hostname}:8000/api/v1/auth/login`, {
+      const response = await axios.post(`${getBaseUrl()}/auth/login`, {
         email: adminEmail,
         password: adminPassword,
       });

@@ -1,9 +1,28 @@
 import axios from 'axios';
 
-// Infere o IP do servidor baseado no acesso do browser do smartphone
-const getBaseUrl = () => {
+// Infere a URL base da API com suporte a variáveis de ambiente e fallback para o Render na nuvem
+export const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   const hostname = window.location.hostname;
+  if (hostname.includes('vercel.app')) {
+    return 'https://novalab-api.onrender.com/api/v1';
+  }
   return `http://${hostname}:8000/api/v1`;
+};
+
+// Infere a URL do WebSocket para tempo real
+export const getWsUrl = () => {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  const hostname = window.location.hostname;
+  if (hostname.includes('vercel.app')) {
+    return 'wss://novalab-api.onrender.com/ws';
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${hostname}:8000/ws`;
 };
 
 const api = axios.create({

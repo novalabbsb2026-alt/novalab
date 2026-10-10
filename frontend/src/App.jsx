@@ -17,7 +17,7 @@ import OSWorkflow from './components/OSWorkflow';
 import OSDashboard from './components/OSDashboard';
 import AdminLentes from './components/AdminLentes';
 import Login from './components/Login';
-import api from './services/api';
+import api, { getBaseUrl } from './services/api';
 import CadastroOticas from './components/CadastroOticas';
 import CatalogoFinanceiro from './components/CatalogoFinanceiro';
 import TabelaPrecos from './components/TabelaPrecos';
@@ -243,8 +243,7 @@ function App() {
           e.preventDefault();
           
           try {
-            const hostname = window.location.hostname;
-            const response = await axios.post(`http://${hostname}:8000/api/v1/factory/os/bip-bancada`, {
+            const response = await axios.post(`${getBaseUrl()}/factory/os/bip-bancada`, {
               os_number: buffer
             });
             showToast(`OS ${buffer} bipada e transicionada para ${response.data.status} com sucesso!`, 'success');

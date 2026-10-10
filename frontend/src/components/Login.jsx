@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ShieldAlert, LogIn, User } from 'lucide-react';
 import axios from 'axios';
+import { getBaseUrl } from '../services/api';
 
 const Login = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
@@ -27,9 +28,8 @@ const Login = ({ onLoginSuccess }) => {
     setLoading(true);
     setError('');
 
-    const hostname = window.location.hostname;
     try {
-      const response = await axios.post(`http://${hostname}:8000/api/v1/auth/login`, {
+      const response = await axios.post(`${getBaseUrl()}/auth/login`, {
         email: email,
         password: password,
       });
@@ -81,10 +81,9 @@ const Login = ({ onLoginSuccess }) => {
     setFirstAccessLoading(true);
     setFirstAccessError('');
 
-    const hostname = window.location.hostname;
     try {
       await axios.post(
-        `http://${hostname}:8000/api/v1/auth/change-password`,
+        `${getBaseUrl()}/auth/change-password`,
         { new_password: newPassword },
         {
           headers: {

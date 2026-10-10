@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Package, Layers } from 'lucide-react';
+import { getBaseUrl } from '../services/api';
 
 // Registra módulos do Chart.js
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
@@ -10,11 +11,6 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tool
 const FunnelChart = ({ refreshTrigger }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  const getBaseUrl = () => {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:8000/api/v1`;
-  };
 
   useEffect(() => {
     loadFunnelData();

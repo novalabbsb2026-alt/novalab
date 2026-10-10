@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api, { OSService } from '../services/api';
+import axios from 'axios';
+import api, { OSService, getBaseUrl, getWsUrl } from '../services/api';
 import { DollarSign, RefreshCw, BarChart2, ShieldAlert, CheckCircle, Activity, Hourglass, FileText } from 'lucide-react';
 import FunnelChart from './FunnelChart';
 import HeatmapMatrix from './HeatmapMatrix';
@@ -12,8 +13,7 @@ const OSDashboard = () => {
   useEffect(() => {
     loadKpis();
 
-    const hostname = window.location.hostname;
-    const ws = new WebSocket(`ws://${hostname}:8000/ws`);
+    const ws = new WebSocket(getWsUrl());
 
     ws.onmessage = (event) => {
       try {

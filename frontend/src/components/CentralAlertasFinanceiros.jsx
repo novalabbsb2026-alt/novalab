@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, DollarSign, Building2, Calendar, X, ArrowRight, Bell, BellOff, CheckCircle } from 'lucide-react';
+import { getBaseUrl } from '../services/api';
 
 export default function CentralAlertasFinanceiros({ isOpen, onClose, onNavigateToFinance }) {
   const [data, setData] = useState(null);
@@ -8,8 +9,7 @@ export default function CentralAlertasFinanceiros({ isOpen, onClose, onNavigateT
 
   const fetchAlerts = () => {
     const token = localStorage.getItem('factory_token') || localStorage.getItem('token');
-    const hostname = window.location.hostname;
-    fetch(`http://${hostname}:8000/api/v1/finance-corp/overdue-alerts`, {
+    fetch(`${getBaseUrl()}/finance-corp/overdue-alerts`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : null)
@@ -28,8 +28,7 @@ export default function CentralAlertasFinanceiros({ isOpen, onClose, onNavigateT
     setDismissingId(payableId);
     try {
       const token = localStorage.getItem('factory_token') || localStorage.getItem('token');
-      const hostname = window.location.hostname;
-      const res = await fetch(`http://${hostname}:8000/api/v1/finance-corp/payables/${payableId}/dismiss-alert`, {
+      const res = await fetch(`${getBaseUrl()}/finance-corp/payables/${payableId}/dismiss-alert`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
