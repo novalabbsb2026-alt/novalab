@@ -94,7 +94,7 @@ def receive_before_flush(session, flush_context, instances):
             record_id=record_id,
             old_values=None,
             new_values=json.dumps(attrs),
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         audit_logs_to_add.append(audit)
         
@@ -143,7 +143,7 @@ def receive_before_flush(session, flush_context, instances):
                 record_id=record_id,
                 old_values=json.dumps(old_attrs) if old_attrs else None,
                 new_values=json.dumps(new_attrs) if new_attrs else None,
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None)
             )
             audit_logs_to_add.append(audit)
 
@@ -180,7 +180,7 @@ def receive_before_flush(session, flush_context, instances):
             record_id=record_id,
             old_values=json.dumps(attrs),
             new_values=None,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         audit_logs_to_add.append(audit)
         
