@@ -442,36 +442,32 @@ async def detect_face_shape_gemini(image_bytes: bytes) -> tuple[str, str, str]:
         raise ValueError("GEMINI_API_KEY não configurada no ambiente.")
         
     try:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        from langchain_core.messages import HumanMessage
-        from pydantic import BaseModel as PydanticBaseModel, Field as PydanticField
-        
-        class FaceAnalysis(PydanticBaseModel):
-            face_shape: str = PydanticField(..., description="Formato do rosto detectado: ROUND, SQUARE, HEART ou OVAL")
-            recommended_frame_types: str = PydanticField(..., description="Tipos de armações recomendadas para esse formato")
-            reasoning: str = PydanticField(..., description="Justificativa estética baseada nos traços faciais analisados")
-            
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.0)
-        structured_llm = llm.with_structured_output(FaceAnalysis)
-        
+        import json
+        import httpx
+        api_key = os.getenv("GEMINI_API_KEY")
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         
         prompt = """Você é um especialista em visagismo e estética de óculos.
 Analise a foto do rosto do cliente e identifique seu formato facial predominante: ROUND, SQUARE, HEART ou OVAL.
-Forneça as armações sugeridas que harmonizam com o formato detectado e explique os princípios estéticos da escolha.
-"""
-        message = HumanMessage(
-            content=[
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
-                }
-            ]
-        )
-        
-        res = await structured_llm.ainvoke([message])
-        return res.face_shape, res.recommended_frame_types, res.reasoning
+Retorne APENAS um JSON com as chaves:
+{"face_shape": "ROUND|SQUARE|HEART|OVAL", "recommended_frame_types": "...", "reasoning": "..."}"""
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_b64}}
+                ]
+            }],
+            "generationConfig": {"responseMimeType": "application/json", "temperature": 0.0}
+        }
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(raw_text)
+            return parsed["face_shape"], parsed["recommended_frame_types"], parsed["reasoning"]
     except Exception as e:
         print(f"Erro na análise de visagismo com Gemini: {e}")
         raise e

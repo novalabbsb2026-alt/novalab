@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-import google.generativeai as genai
+import httpx
 
 from backend.app.models.os import ServiceOrder, OSStatus
 from backend.app.models.optical_store import OpticalStore
@@ -287,35 +287,37 @@ async def ask_assistant(db: AsyncSession, question: str) -> str:
         return await execute_local_fallback(db, question)
         
     try:
-        # Configura o Gemini SDK
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=SYSTEM_INSTRUCTION
-        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         
+        async def _call_gemini(prompt_text: str) -> str:
+            payload = {
+                "systemInstruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
+                "contents": [{"parts": [{"text": prompt_text}]}]
+            }
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
         # Primeira chamada para detectar a intenção (se precisa de ferramenta)
-        response = model.generate_content(question)
-        response_text = response.text.strip()
+        response_text = await _call_gemini(question)
         
         # Analisa se o modelo solicitou chamada de ferramenta
         if "[CALL_TOOL: get_top_billing_stores]" in response_text:
             stores = await get_top_billing_stores(db)
             data_context = f"Resultado dos dados das óticas que mais faturaram: {stores}"
-            final_response = model.generate_content(f"Pergunta original: {question}\n{data_context}")
-            return final_response.text
+            return await _call_gemini(f"Pergunta original: {question}\n{data_context}")
             
         elif "[CALL_TOOL: get_top_consumed_lenses]" in response_text:
             lenses = await get_top_consumed_lenses(db)
             data_context = f"Resultado dos dados das lentes de maior consumo: {lenses}"
-            final_response = model.generate_content(f"Pergunta original: {question}\n{data_context}")
-            return final_response.text
+            return await _call_gemini(f"Pergunta original: {question}\n{data_context}")
             
         elif "[CALL_TOOL: get_overdue_service_orders]" in response_text:
             orders = await get_overdue_service_orders(db)
             data_context = f"Resultado dos dados das ordens de serviço atrasadas: {orders}"
-            final_response = model.generate_content(f"Pergunta original: {question}\n{data_context}")
-            return final_response.text
+            return await _call_gemini(f"Pergunta original: {question}\n{data_context}")
             
         # Se o modelo respondeu diretamente sem tag de tool
         return response_text

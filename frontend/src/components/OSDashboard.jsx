@@ -13,7 +13,10 @@ const OSDashboard = () => {
   useEffect(() => {
     loadKpis();
 
-    const ws = new WebSocket(getWsUrl());
+    const wsUrl = getWsUrl();
+    if (!wsUrl) return;
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
       try {

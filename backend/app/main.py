@@ -53,13 +53,18 @@ async def global_exception_handler(request, exc):
     )
 
 @app.get("/db-health")
+@app.get("/api/v1/db-health")
 async def db_health():
     try:
         async with engine.connect() as conn:
             res = await conn.execute(text("SELECT version();"))
             row = res.scalar()
+            try:
+                await conn.execute(text("SELECT COUNT(*) FROM users;"))
+            except Exception:
+                pass
         masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "SEM_ARROBA"
-        return {"status": "ok", "db_version": str(row), "host": masked, "version": "v1.0.3-dbg"}
+        return {"status": "ok", "db_version": str(row), "host": masked, "version": "v1.1.0-vercel"}
     except Exception as e:
         import traceback
         masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "SEM_ARROBA"
@@ -87,6 +92,10 @@ async def auto_backup_loop():
 # Cria as tabelas do banco no startup e inicia backups automáticos
 @app.on_event("startup")
 async def startup_event():
+    # No ambiente Serverless da Vercel, evita loops infinitos, abertura de navegador e migrações pesadas no cold start
+    if os.getenv("VERCEL"):
+        return
+
     try:
         # Gera backup automático inicial no startup
         try:

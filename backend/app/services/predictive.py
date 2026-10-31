@@ -4,7 +4,6 @@ from typing import List, Dict, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-import pandas as pd
 from backend.app.models.lens import LensInventoryGrade
 from backend.app.models.movement import StockMovement
 

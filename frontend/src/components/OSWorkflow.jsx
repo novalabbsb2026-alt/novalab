@@ -183,7 +183,10 @@ const OSWorkflow = () => {
 
   // WebSocket real-time updates listener
   useEffect(() => {
-    const ws = new WebSocket(getWsUrl());
+    const wsUrl = getWsUrl();
+    if (!wsUrl) return;
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
       try {

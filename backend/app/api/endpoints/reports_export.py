@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-import pandas as pd
+from openpyxl import Workbook
 
 from backend.app.core.database import get_db
 from backend.app.api.deps import get_current_active_operator
@@ -122,113 +122,118 @@ async def export_report_excel(
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     output = io.BytesIO()
 
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if report_type == "production":
-            data = await get_production_analytic_report(
-                start_date=start_date, end_date=end_date, optical_store_id=optical_store_id, db=db, current_user=current_user
-            )
-            rows = []
-            for o in data.orders:
-                rows.append({
-                    "Número OS": o.os_number,
-                    "Pedido Loja": o.client_order_number or "",
-                    "Ótica Cliente": o.optical_store_name,
-                    "Bandeja": o.tray_number or "",
-                    "Tipo OS": o.os_type,
-                    "Status": o.status,
-                    "Prioridade": o.priority,
-                    "Rota de Produção": o.production_route,
-                    "Modelo Lente": o.lens_model_name or "",
-                    "Grau OD": o.od_degree or "",
-                    "Grau OE": o.oe_degree or "",
-                    "Lead Time (Horas)": o.lead_time_hours if o.lead_time_hours is not None else 0.0,
-                    "Valor Total (R$)": float(o.total_amount),
-                    "Data Criação": o.created_at.strftime("%d/%m/%Y %H:%M")
-                })
-            df = pd.DataFrame(rows)
-            df.to_excel(writer, sheet_name="Produção MES", index=False)
-            filename = f"export_producao_{ts}.xlsx"
+    def _write_rows_to_workbook(rows: list, sheet_name: str):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = sheet_name[:31]
+        if rows:
+            headers = list(rows[0].keys())
+            ws.append(headers)
+            for r in rows:
+                ws.append([r.get(h, "") for h in headers])
+        wb.save(output)
 
-        elif report_type == "kardex":
-            data = await get_inventory_kardex_report(matrix_type=matrix_type, db=db, current_user=current_user)
-            rows = []
-            for it in data.items:
-                rows.append({
-                    "Matriz": it.matrix_type,
-                    "Modelo": it.model_name,
-                    "Marca": it.brand,
-                    "Tratamento": it.treatment,
-                    "Índice Refração": float(it.refractive_index) if it.refractive_index else 1.56,
-                    "Curva Base": float(it.base_curve) if it.base_curve is not None else "",
-                    "Grau Esférico": float(it.spherical) if it.spherical is not None else "",
-                    "Grau Cilíndrico": float(it.cylindrical) if it.cylindrical is not None else "",
-                    "Adição": float(it.addition) if it.addition is not None else "",
-                    "Olho": it.eye or "AMB",
-                    "Gaveta/Local": it.location_tag or "",
-                    "Código Barras / EAN": it.barcode or "",
-                    "Saldo Físico (un)": it.quantity_available,
-                    "Reservado (un)": it.reserved_quantity,
-                    "Saldo Livre (un)": it.free_quantity,
-                    "Custo Médio CMP (R$)": float(it.unit_cost_cmp),
-                    "Valor Total Estoque (R$)": float(it.total_value_cmp)
-                })
-            df = pd.DataFrame(rows)
-            df.to_excel(writer, sheet_name="Posição Kardex", index=False)
-            filename = f"export_kardex_estoque_{ts}.xlsx"
+    if report_type == "production":
+        data = await get_production_analytic_report(
+            start_date=start_date, end_date=end_date, optical_store_id=optical_store_id, db=db, current_user=current_user
+        )
+        rows = []
+        for o in data.orders:
+            rows.append({
+                "Número OS": o.os_number,
+                "Pedido Loja": o.client_order_number or "",
+                "Ótica Cliente": o.optical_store_name,
+                "Bandeja": o.tray_number or "",
+                "Tipo OS": o.os_type,
+                "Status": o.status,
+                "Prioridade": o.priority,
+                "Rota de Produção": o.production_route,
+                "Modelo Lente": o.lens_model_name or "",
+                "Grau OD": o.od_degree or "",
+                "Grau OE": o.oe_degree or "",
+                "Lead Time (Horas)": o.lead_time_hours if o.lead_time_hours is not None else 0.0,
+                "Valor Total (R$)": float(o.total_amount),
+                "Data Criação": o.created_at.strftime("%d/%m/%Y %H:%M")
+            })
+        _write_rows_to_workbook(rows, "Produção MES")
+        filename = f"export_producao_{ts}.xlsx"
 
-        elif report_type == "commercial":
-            data = await get_commercial_ranking_report(start_date=start_date, end_date=end_date, db=db, current_user=current_user)
-            rows = []
-            for r in data.ranking:
-                rows.append({
-                    "Razão Social": r.store_name,
-                    "Nome Fantasia": r.trade_name or "",
-                    "CNPJ": r.cnpj or "",
-                    "Total OSs Faturadas": r.total_orders_count,
-                    "Faturamento Total (R$)": float(r.total_billed_amount),
-                    "Ticket Médio (R$)": float(r.average_ticket),
-                    "Política de Crédito": r.status_policy
-                })
-            df = pd.DataFrame(rows)
-            df.to_excel(writer, sheet_name="Ranking Óticas", index=False)
-            filename = f"export_ranking_comercial_{ts}.xlsx"
+    elif report_type == "kardex":
+        data = await get_inventory_kardex_report(matrix_type=matrix_type, db=db, current_user=current_user)
+        rows = []
+        for it in data.items:
+            rows.append({
+                "Matriz": it.matrix_type,
+                "Modelo": it.model_name,
+                "Marca": it.brand,
+                "Tratamento": it.treatment,
+                "Índice Refração": float(it.refractive_index) if it.refractive_index else 1.56,
+                "Curva Base": float(it.base_curve) if it.base_curve is not None else "",
+                "Grau Esférico": float(it.spherical) if it.spherical is not None else "",
+                "Grau Cilíndrico": float(it.cylindrical) if it.cylindrical is not None else "",
+                "Adição": float(it.addition) if it.addition is not None else "",
+                "Olho": it.eye or "AMB",
+                "Gaveta/Local": it.location_tag or "",
+                "Código Barras / EAN": it.barcode or "",
+                "Saldo Físico (un)": it.quantity_available,
+                "Reservado (un)": it.reserved_quantity,
+                "Saldo Livre (un)": it.free_quantity,
+                "Custo Médio CMP (R$)": float(it.unit_cost_cmp),
+                "Valor Total Estoque (R$)": float(it.total_value_cmp)
+            })
+        _write_rows_to_workbook(rows, "Posição Kardex")
+        filename = f"export_kardex_estoque_{ts}.xlsx"
 
-        elif report_type == "aging":
-            data = await get_financial_aging_report(optical_store_id=optical_store_id, db=db, current_user=current_user)
-            rows = []
-            for t in data.titles:
-                rows.append({
-                    "Ótica Cliente": t.store_name,
-                    "Nº Documento / Fatura": t.document_number,
-                    "Data Vencimento": t.due_date.strftime("%d/%m/%Y"),
-                    "Dias de Atraso": t.days_overdue,
-                    "Faixa Aging": t.aging_bucket,
-                    "Status": t.status,
-                    "Valor Título (R$)": float(t.amount),
-                    "Valor Pago (R$)": float(t.amount_paid),
-                    "Saldo Devedor (R$)": float(t.balance_due)
-                })
-            df = pd.DataFrame(rows)
-            df.to_excel(writer, sheet_name="Aging Contas a Receber", index=False)
-            filename = f"export_aging_inadimplencia_{ts}.xlsx"
+    elif report_type == "commercial":
+        data = await get_commercial_ranking_report(start_date=start_date, end_date=end_date, db=db, current_user=current_user)
+        rows = []
+        for r in data.ranking:
+            rows.append({
+                "Razão Social": r.store_name,
+                "Nome Fantasia": r.trade_name or "",
+                "CNPJ": r.cnpj or "",
+                "Total OSs Faturadas": r.total_orders_count,
+                "Faturamento Total (R$)": float(r.total_billed_amount),
+                "Ticket Médio (R$)": float(r.average_ticket),
+                "Política de Crédito": r.status_policy
+            })
+        _write_rows_to_workbook(rows, "Ranking Óticas")
+        filename = f"export_ranking_comercial_{ts}.xlsx"
 
-        elif report_type == "dre":
-            if role_name != "Administrador":
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas administradores podem exportar o DRE.")
-            data = await get_financial_dre_report(start_date=start_date, end_date=end_date, db=db, current_user=current_user)
-            rows = []
-            for d in data.dre_statement:
-                rows.append({
-                    "Conta": d.account_code,
-                    "Descrição": d.description,
-                    "Valor (R$)": float(d.amount),
-                    "% Receita Líquida": d.percentage
-                })
-            df = pd.DataFrame(rows)
-            df.to_excel(writer, sheet_name="DRE Gerencial", index=False)
-            filename = f"export_dre_{ts}.xlsx"
-        else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de relatório inválido.")
+    elif report_type == "aging":
+        data = await get_financial_aging_report(optical_store_id=optical_store_id, db=db, current_user=current_user)
+        rows = []
+        for t in data.titles:
+            rows.append({
+                "Ótica Cliente": t.store_name,
+                "Nº Documento / Fatura": t.document_number,
+                "Data Vencimento": t.due_date.strftime("%d/%m/%Y"),
+                "Dias de Atraso": t.days_overdue,
+                "Faixa Aging": t.aging_bucket,
+                "Status": t.status,
+                "Valor Título (R$)": float(t.amount),
+                "Valor Pago (R$)": float(t.amount_paid),
+                "Saldo Devedor (R$)": float(t.balance_due)
+            })
+        _write_rows_to_workbook(rows, "Aging Contas a Receber")
+        filename = f"export_aging_inadimplencia_{ts}.xlsx"
+
+    elif report_type == "dre":
+        if role_name != "Administrador":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas administradores podem exportar o DRE.")
+        data = await get_financial_dre_report(start_date=start_date, end_date=end_date, db=db, current_user=current_user)
+        rows = []
+        for d in data.dre_statement:
+            rows.append({
+                "Conta": d.account_code,
+                "Descrição": d.description,
+                "Valor (R$)": float(d.amount),
+                "% Receita Líquida": d.percentage
+            })
+        _write_rows_to_workbook(rows, "DRE Gerencial")
+        filename = f"export_dre_{ts}.xlsx"
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de relatório inválido.")
 
     output.seek(0)
     return StreamingResponse(

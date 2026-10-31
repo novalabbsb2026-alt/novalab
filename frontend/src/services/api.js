@@ -1,25 +1,25 @@
 import axios from 'axios';
 
-// Infere a URL base da API com suporte a variáveis de ambiente e fallback para o Render na nuvem
+// Infere a URL base da API com suporte a variáveis de ambiente e Serverless integrado na Vercel
 export const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   const hostname = window.location.hostname;
   if (hostname.includes('vercel.app')) {
-    return 'https://novalab-api.onrender.com/api/v1';
+    return '/api/v1';
   }
   return `http://${hostname}:8000/api/v1`;
 };
 
-// Infere a URL do WebSocket para tempo real
+// Infere a URL do WebSocket para tempo real (em Serverless Vercel retorna null se VITE_WS_URL não estiver definida)
 export const getWsUrl = () => {
   if (import.meta.env.VITE_WS_URL) {
     return import.meta.env.VITE_WS_URL;
   }
   const hostname = window.location.hostname;
   if (hostname.includes('vercel.app')) {
-    return 'wss://novalab-api.onrender.com/ws';
+    return null;
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${hostname}:8000/ws`;

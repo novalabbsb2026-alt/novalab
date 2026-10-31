@@ -1,17 +1,35 @@
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 from backend.app.core.config import settings
 import os as _os
 
 # Ativa log de queries SQL apenas em modo de desenvolvimento
 _is_dev = _os.getenv("APP_ENV", "production").lower() == "development"
+_is_vercel = bool(_os.getenv("VERCEL"))
 
-# Cria o engine assíncrono para o PostgreSQL
+# Normaliza a URL caso seja informada como postgres:// ou postgresql:// sem +asyncpg
+_db_url = settings.DATABASE_URL
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif _db_url.startswith("postgresql://"):
+    _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+_engine_kwargs = {
+    "echo": _is_dev,
+    "future": True,
+}
+
+if _is_vercel or "pooler.supabase.com" in _db_url:
+    _engine_kwargs["poolclass"] = NullPool
+    if _db_url.startswith("postgresql+asyncpg://"):
+        _engine_kwargs["connect_args"] = {"statement_cache_size": 0}
+
+# Cria o engine assíncrono para o PostgreSQL / SQLite
 engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=_is_dev,  # True apenas em APP_ENV=development
-    future=True
+    _db_url,
+    **_engine_kwargs
 )
 
 

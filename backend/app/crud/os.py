@@ -16,19 +16,22 @@ from backend.app.crud import customer_price as crud_customer_price
 from backend.app.schemas.movement import StockMovementCreate
 
 async def generate_clinical_embedding(text: str) -> List[float]:
-    import google.generativeai as genai
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return [0.0] * 512
     try:
-        genai.configure(api_key=api_key)
-        response = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type="retrieval_document",
-            output_dimensionality=512
-        )
-        return response['embedding']
+        import httpx
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
+        payload = {
+            "model": "models/text-embedding-004",
+            "content": {"parts": [{"text": text}]},
+            "taskType": "RETRIEVAL_DOCUMENT",
+            "outputDimensionality": 512
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()["embedding"]["values"]
     except Exception as e:
         print(f"[AI Embedding] Erro ao gerar embedding: {e}")
         return [0.0] * 512

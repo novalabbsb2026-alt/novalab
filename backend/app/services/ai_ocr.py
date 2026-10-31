@@ -93,41 +93,50 @@ async def analyze_recipe_image(filename: str, image_bytes: bytes) -> Dict[str, A
         return get_mock_recipe(filename)
         
     try:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        from langchain_core.messages import HumanMessage
-        # Inicializa o Gemini multimodal via LangChain
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.0)
-        structured_llm = llm.with_structured_output(RecipeData)
-        
-        # Converte a imagem para Base64 para envio na mensagem
+        import json
+        import httpx
+        api_key = os.getenv("GEMINI_API_KEY")
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         
         prompt = """Você é um assistente óptico especialista em ler receitas médicas de óculos (oftálmicas).
-Analise a imagem da receita médica anexada e extraia as seguintes informações estruturadas:
-- Nome do cliente (client_name)
-- Nome do médico oftalmologista (doctor_name)
-- Nome da ótica/loja emissora se houver (shop_name)
-- Grau Esférico, Cilíndrico, Eixo, Adição e DNP para Olho Direito (OD)
-- Grau Esférico, Cilíndrico, Eixo, Adição e DNP para Olho Esquerdo (OE)
-
+Analise a imagem da receita médica anexada e extraia as informações no formato JSON exatamente com as seguintes chaves:
+{
+  "client_name": "",
+  "doctor_name": "",
+  "shop_name": "",
+  "od_spherical": 0.0,
+  "od_cylindrical": 0.0,
+  "od_axis": 0,
+  "od_addition": 0.0,
+  "od_dnp": 32.0,
+  "oe_spherical": 0.0,
+  "oe_cylindrical": 0.0,
+  "oe_axis": 0,
+  "oe_addition": 0.0,
+  "oe_dnp": 32.0
+}
 Observações importantes:
 1. Mantenha os sinais matemáticos de positivo (+) e negativo (-) originais.
 2. Eixos de astigmatismo variam de 0 a 180.
 3. Se algum valor não for encontrado, defina-o como 0.0 para numéricos e string vazia ("") para textos.
-"""
+Retorne APENAS o JSON válido."""
 
-        message = HumanMessage(
-            content=[
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
-                }
-            ]
-        )
-        
-        result = await structured_llm.ainvoke([message])
-        return result.model_dump()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_b64}}
+                ]
+            }],
+            "generationConfig": {"responseMimeType": "application/json", "temperature": 0.0}
+        }
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(raw_text)
+            return RecipeData(**parsed).model_dump()
         
     except Exception as e:
         print(f"Erro no processamento OCR com Gemini: {e}. caindo para Mock.")
