@@ -1,0 +1,8 @@
+{
+  "name": "novalab",
+  "private": true,
+  "scripts": {
+    "install-frontend": "cd frontend && npm install",
+    "build": "cd frontend && npm install && npm run build"
+  }
+}
