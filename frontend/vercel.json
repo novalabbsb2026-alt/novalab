@@ -9,7 +9,7 @@
       "destination": "/api/index.py"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|db-health|docs|openapi.json).*)",
       "destination": "/index.html"
     }
   ],
