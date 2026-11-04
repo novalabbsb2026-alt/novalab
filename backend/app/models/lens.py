@@ -62,7 +62,6 @@ class LensModel(Base):
         cyl = Decimal(str(cylindrical or "0.00"))
 
         if cyl > Decimal("0.00"):
-            sph = sph + cyl
             cyl = -cyl
 
         abs_sph = abs(sph)

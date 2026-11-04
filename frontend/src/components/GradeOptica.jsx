@@ -64,11 +64,9 @@ const GradeOptica = ({ onOpenManualInsert }) => {
       const transposedData = (response.data || []).map(item => {
         const cyl = parseFloat(item.cylindrical);
         if (cyl > 0) {
-          const sph = parseFloat(item.spherical);
           return {
             ...item,
-            spherical: (sph + cyl).toFixed(2),
-            cylindrical: (-cyl).toFixed(2)
+            cylindrical: (-Math.abs(cyl)).toFixed(2)
           };
         }
         return item;
@@ -97,8 +95,7 @@ const GradeOptica = ({ onOpenManualInsert }) => {
     let cyl = parseFloat(cylindrical) || 0.0;
 
     if (cyl > 0) {
-      sph = sph + cyl;
-      cyl = -cyl;
+      cyl = -Math.abs(cyl);
     }
 
     const absSph = Math.abs(sph);
@@ -686,8 +683,8 @@ const GradeOptica = ({ onOpenManualInsert }) => {
                     </strong>
                     <span style={{ fontSize: '0.75rem', display: 'block', color: 'hsl(var(--text-secondary))', marginTop: '2px' }}>
                       {priceInfo.isOver 
-                        ? `Sobretaxa aplicada: Excede limite de ${priceInfo.threshold.toFixed(2)}D CIL ou 4.00D ESF` 
-                        : `Faixa Padrão: ≤ 4.00D ESF e ≤ ${priceInfo.threshold.toFixed(2)}D CIL`}
+                        ? `Grau ${selectedCell.spherical > 0 ? '+' : ''}${selectedCell.spherical.toFixed(2)} ESF / ${selectedCell.cylindrical.toFixed(2)} CIL (Excede limite de ${priceInfo.threshold.toFixed(2)}D CIL ou 4.00D ESF)` 
+                        : `Grau ${selectedCell.spherical > 0 ? '+' : ''}${selectedCell.spherical.toFixed(2)} ESF / ${selectedCell.cylindrical.toFixed(2)} CIL (Faixa Padrão: até 4.00D ESF e ${priceInfo.threshold.toFixed(2)}D CIL)`}
                     </span>
                   </div>
                   <span style={{ 

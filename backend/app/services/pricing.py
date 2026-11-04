@@ -18,9 +18,7 @@ async def calculate_lp_auto_price(
     sph = Decimal(str(spherical))
     cyl = Decimal(str(cylindrical))
 
-    # Transposição de Cilíndrico Positivo para Negativo
     if cyl > 0:
-        sph = sph + cyl
         cyl = -cyl
 
     # Busca política por faixa matemática de dioptria

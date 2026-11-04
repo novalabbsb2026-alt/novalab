@@ -184,8 +184,7 @@ export default function UnifiedLensRegister({ initialData = null, onComplete = n
     let cylVal = parseFloat(cylindrical) || 0.0;
 
     if (cylVal > 0) {
-      sphVal = sphVal + cylVal;
-      cylVal = -cylVal;
+      cylVal = -Math.abs(cylVal);
     }
 
     const absSph = Math.abs(sphVal);
@@ -379,8 +378,7 @@ export default function UnifiedLensRegister({ initialData = null, onComplete = n
       let rawCyl = cylindrical !== '' && cylindrical !== null && cylindrical !== undefined ? parseNum(cylindrical, 0.0) : 0.0;
 
       if (rawCyl > 0) {
-        rawSph = rawSph + rawCyl;
-        rawCyl = -rawCyl;
+        rawCyl = -Math.abs(rawCyl);
       }
 
       if (rawSph < -6.00 || rawSph > 6.00) {
@@ -458,7 +456,7 @@ export default function UnifiedLensRegister({ initialData = null, onComplete = n
           barcode: finalBarcode,
           lens_model_id: createdModel.id,
           spherical: spherical !== '' ? parseNum(spherical, 0.0) : 0.0,
-          cylindrical: cylindrical !== '' ? parseNum(cylindrical, 0.0) : 0.0,
+          cylindrical: cylindrical !== '' ? -Math.abs(parseNum(cylindrical, 0.0)) : 0.0,
           base_curve: baseCurve !== '' ? parseNum(baseCurve, 0.0) : (isMultifocal ? 0.0 : null),
           addition: addition !== '' ? parseNum(addition, 0.0) : (isMultifocal ? 0.0 : null),
           eye: finalEye,

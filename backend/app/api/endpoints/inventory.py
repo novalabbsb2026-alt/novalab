@@ -116,13 +116,13 @@ async def register_fallback(
         if l_model:
             target_matrix = l_model.matrix_type or "LP_GRADE"
 
+    # Normaliza cilíndrico para negativo caso informado como positivo na grade
+    if payload.cylindrical is not None and float(payload.cylindrical) > 0:
+        payload.cylindrical = -abs(payload.cylindrical)
+
     if target_matrix == "LP_GRADE":
         sph_val = float(payload.spherical if payload.spherical is not None else 0.0)
         cyl_val = float(payload.cylindrical if payload.cylindrical is not None else 0.0)
-
-        if cyl_val > 0:
-            sph_val = sph_val + cyl_val
-            cyl_val = -cyl_val
 
         if sph_val < -6.00 or sph_val > 6.00:
             raise HTTPException(

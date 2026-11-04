@@ -176,8 +176,7 @@ const FallbackModal = ({
       let finalCyl = cylVal;
 
       if (cylVal > 0) {
-        finalSph = sphVal + cylVal;
-        finalCyl = -cylVal;
+        finalCyl = -Math.abs(cylVal);
       }
 
       const absSph = Math.abs(finalSph);
@@ -229,8 +228,7 @@ const FallbackModal = ({
 
     // Se o Grau Cilíndrico for positivo, transpõe para Cilíndrico Negativo
     if (cylVal > 0) {
-      finalSph = sphVal + cylVal;
-      finalCyl = -cylVal;
+      finalCyl = -Math.abs(cylVal);
     }
 
     const payload = {

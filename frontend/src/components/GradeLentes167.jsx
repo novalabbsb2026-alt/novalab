@@ -52,11 +52,9 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
       const transposedData = data.map(item => {
         const cyl = parseFloat(item.cylindrical);
         if (cyl > 0) {
-          const sph = parseFloat(item.spherical);
           return {
             ...item,
-            spherical: (sph + cyl).toFixed(2),
-            cylindrical: (-cyl).toFixed(2)
+            cylindrical: (-Math.abs(cyl)).toFixed(2)
           };
         }
         return item;
