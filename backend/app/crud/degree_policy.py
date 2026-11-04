@@ -36,7 +36,7 @@ async def create_or_update_policy(
         policy.default_sale_price_gt = policy_in.default_sale_price_gt
         policy.is_active = policy_in.is_active
         policy.updated_by_id = user_id
-        policy.updated_at = datetime.now(timezone.utc)
+        policy.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.add(policy)
 
     await db.flush()
@@ -68,7 +68,7 @@ async def create_or_update_policy(
                         price=new_price,
                         cost_price=prod.cost_price,
                         version=prod.current_version,
-                        start_date=datetime.now(timezone.utc),
+                        start_date=datetime.now(timezone.utc).replace(tzinfo=None),
                         change_reason=f"Atualização em lote (Cascade Update) via Regra Global por Grau (Limite: {policy.degree_threshold:.2f}D)"
                     )
                     db.add(price_hist)

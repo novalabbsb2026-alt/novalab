@@ -182,7 +182,7 @@ async def create_product(
         price=db_product.sale_price,
         cost_price=db_product.cost_price,
         version=1,
-        start_date=datetime.now(timezone.utc),
+        start_date=datetime.now(timezone.utc).replace(tzinfo=None),
         changed_by_id=user_id,
         change_reason=product_in.change_reason or "Cadastro inicial do produto"
     )
@@ -218,7 +218,7 @@ async def update_product(
         )
         last_hist = (await db.execute(hist_query)).scalars().first()
         if last_hist:
-            last_hist.end_date = datetime.now(timezone.utc)
+            last_hist.end_date = datetime.now(timezone.utc).replace(tzinfo=None)
             db.add(last_hist)
             
         # 2. Incrementa a versão
@@ -235,7 +235,7 @@ async def update_product(
             price=new_sale,
             cost_price=new_cost,
             version=new_version,
-            start_date=datetime.now(timezone.utc),
+            start_date=datetime.now(timezone.utc).replace(tzinfo=None),
             changed_by_id=user_id,
             change_reason=product_in.change_reason or f"Reajuste de preço (v.{new_version})"
         )
@@ -460,7 +460,7 @@ async def create_treatment(
         entity_id=db_treatment.id,
         price=db_treatment.price,
         version=1,
-        start_date=datetime.now(timezone.utc),
+        start_date=datetime.now(timezone.utc).replace(tzinfo=None),
         changed_by_id=user_id,
         change_reason=treatment_in.change_reason or "Cadastro inicial do tratamento"
     )
@@ -493,7 +493,7 @@ async def update_treatment(
         )
         last_hist = (await db.execute(hist_query)).scalars().first()
         if last_hist:
-            last_hist.end_date = datetime.now(timezone.utc)
+            last_hist.end_date = datetime.now(timezone.utc).replace(tzinfo=None)
             db.add(last_hist)
             
         new_version = db_treatment.current_version + 1
@@ -504,7 +504,7 @@ async def update_treatment(
             entity_id=treatment_id,
             price=treatment_in.price,
             version=new_version,
-            start_date=datetime.now(timezone.utc),
+            start_date=datetime.now(timezone.utc).replace(tzinfo=None),
             changed_by_id=user_id,
             change_reason=treatment_in.change_reason or f"Reajuste de preço (v.{new_version})"
         )
@@ -585,7 +585,7 @@ async def create_technical_service(
         entity_id=db_service.id,
         price=db_service.price,
         version=1,
-        start_date=datetime.now(timezone.utc),
+        start_date=datetime.now(timezone.utc).replace(tzinfo=None),
         changed_by_id=user_id,
         change_reason=service_in.change_reason or "Cadastro inicial do serviço técnico"
     )
@@ -618,7 +618,7 @@ async def update_technical_service(
         )
         last_hist = (await db.execute(hist_query)).scalars().first()
         if last_hist:
-            last_hist.end_date = datetime.now(timezone.utc)
+            last_hist.end_date = datetime.now(timezone.utc).replace(tzinfo=None)
             db.add(last_hist)
             
         new_version = db_service.current_version + 1
@@ -629,7 +629,7 @@ async def update_technical_service(
             entity_id=service_id,
             price=service_in.price,
             version=new_version,
-            start_date=datetime.now(timezone.utc),
+            start_date=datetime.now(timezone.utc).replace(tzinfo=None),
             changed_by_id=user_id,
             change_reason=service_in.change_reason or f"Reajuste de preço (v.{new_version})"
         )

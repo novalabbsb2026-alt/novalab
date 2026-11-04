@@ -179,7 +179,7 @@ async def create_lens_model(db: AsyncSession, obj_in: LensModelCreate) -> LensMo
         price=new_prod.sale_price,
         cost_price=new_prod.cost_price,
         version=1,
-        start_date=datetime.now(timezone.utc),
+        start_date=datetime.now(timezone.utc).replace(tzinfo=None),
         change_reason="Cadastro de lente (unificacao)"
     )
     db.add(price_hist)
@@ -235,7 +235,7 @@ async def update_lens_model(db: AsyncSession, model_id: uuid.UUID, obj_in: LensM
                 price=prod.sale_price,
                 cost_price=prod.cost_price,
                 version=prod.current_version,
-                start_date=datetime.now(timezone.utc),
+                start_date=datetime.now(timezone.utc).replace(tzinfo=None),
                 change_reason="Atualizacao de preco da lente (unificacao)"
             )
             db.add(price_hist)

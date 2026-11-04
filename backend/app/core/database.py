@@ -57,9 +57,45 @@ from datetime import datetime, timezone
 # ContextVar para guardar informações do usuário atual (logado)
 current_user_ctx: contextvars.ContextVar[dict] = contextvars.ContextVar("current_user", default=None)
 
+def _strip_tz(val):
+    if isinstance(val, datetime) and val.tzinfo is not None:
+        return val.astimezone(timezone.utc).replace(tzinfo=None)
+    return val
+
+@event.listens_for(engine.sync_engine, "before_cursor_execute", retval=True)
+def _normalize_query_datetime_params(conn, cursor, statement, parameters, context, executemany):
+    """
+    Garante que nenhum datetime com timezone (offset-aware) seja enviado para colunas
+    TIMESTAMP WITHOUT TIME ZONE no PostgreSQL (asyncpg).
+    """
+    if parameters:
+        if isinstance(parameters, dict):
+            parameters = {k: _strip_tz(v) for k, v in parameters.items()}
+        elif isinstance(parameters, tuple):
+            parameters = tuple(_strip_tz(v) for v in parameters)
+        elif isinstance(parameters, list):
+            new_params = []
+            for item in parameters:
+                if isinstance(item, dict):
+                    new_params.append({k: _strip_tz(v) for k, v in item.items()})
+                elif isinstance(item, tuple):
+                    new_params.append(tuple(_strip_tz(v) for v in item))
+                else:
+                    new_params.append(_strip_tz(item))
+            parameters = new_params
+    return statement, parameters
+
 @event.listens_for(Session, "before_flush")
 def receive_before_flush(session, flush_context, instances):
     from backend.app.models.audit import AuditLog
+
+    # Normaliza campos datetime com timezone em objetos novos ou modificados para compatibilidade com asyncpg
+    for obj in list(session.new) + list(session.dirty):
+        if hasattr(obj, "__mapper__"):
+            for mapper_attr in obj.__mapper__.column_attrs:
+                val = getattr(obj, mapper_attr.key, None)
+                if isinstance(val, datetime) and val.tzinfo is not None:
+                    setattr(obj, mapper_attr.key, val.astimezone(timezone.utc).replace(tzinfo=None))
     
     user_info = current_user_ctx.get()
     user_id = None
