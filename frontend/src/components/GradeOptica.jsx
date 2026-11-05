@@ -3,6 +3,44 @@ import React, { useEffect, useState } from 'react';
 import { LensService, InventoryService, DegreePolicyService } from '../services/api';
 import { ShieldAlert, MapPin, Eye, EyeOff, Search, Layers, Edit, Save, Plus, Minus, BarChart2, ShieldCheck, FileText, DollarSign } from 'lucide-react';
 
+const LP_TREATMENT_OPTIONS = [
+  { key: 'incolor_150', label: 'INCOLOR 1.50 (CR-39 - Incolor)' },
+  { key: 'ar_156', label: 'AR 1.56 (Resina - AR)' },
+  { key: 'filtro_azul_ar_156', label: 'FILTRO AZUL AR 1.56 (Resina - Filtro Azul AR)' },
+  { key: 'poly_ar_159', label: 'POLY AR 1.59 (Policarbonato - AR)' },
+  { key: 'poly_filtro_azul_ar_159', label: 'POLY FILTRO AZUL AR 1.59 (Policarbonato - Filtro Azul AR)' },
+  { key: 'photo_ar_156', label: 'PHOTO AR 1.56 (Resina - Photo AR)' },
+  { key: 'photo_filtro_azul_ar_156', label: 'PHOTO FILTRO AZUL AR 1.56 (Resina - Photo Filtro Azul AR)' },
+];
+
+const matchesLpTreatment = (item, filterKey) => {
+  if (!filterKey) return true;
+  const model = item.lens_model || item;
+  const treatment = (model.treatment || item.treatment || 'Incolor').trim().toLowerCase();
+  const material = (model.material || item.material || '').trim().toLowerCase();
+  const refIdx = parseFloat(model.refractive_index || item.refractive_index || 1.56);
+  const isPoly = Math.abs(refIdx - 1.59) < 0.02 || material.includes('poli') || material.includes('poly');
+
+  switch (filterKey) {
+    case 'incolor_150':
+      return ['incolor', 'sem tratamento', 'branco', 'incolor hc', 'padrao'].includes(treatment);
+    case 'ar_156':
+      return ['ar', 'anti reflexo', 'antirreflexo', 'anti-reflexo', 'anti-reflexo ar', 'anti reflexo ar'].includes(treatment) && !isPoly;
+    case 'filtro_azul_ar_156':
+      return ['filtro azul ar', 'filtro azul', 'blue cut', 'blue uv', 'blue', 'blue block'].includes(treatment) && !isPoly;
+    case 'poly_ar_159':
+      return ['ar', 'anti reflexo', 'antirreflexo', 'anti-reflexo', 'anti-reflexo ar', 'anti reflexo ar'].includes(treatment) && isPoly;
+    case 'poly_filtro_azul_ar_159':
+      return ['filtro azul ar', 'filtro azul', 'blue cut', 'blue uv', 'blue', 'blue block'].includes(treatment) && isPoly;
+    case 'photo_ar_156':
+      return ['photo ar', 'fotossensivel', 'transitions', 'photo', 'foto'].includes(treatment);
+    case 'photo_filtro_azul_ar_156':
+      return ['photo filtro azul ar', 'photo blue', 'photo filtro azul', 'transitions blue'].includes(treatment);
+    default:
+      return treatment === filterKey.toLowerCase();
+  }
+};
+
 const GradeOptica = ({ onOpenManualInsert }) => {
 
   const [models, setModels] = useState([]);
@@ -184,11 +222,7 @@ const GradeOptica = ({ onOpenManualInsert }) => {
     });
 
     if (filterTreatment) {
-      const targetLower = filterTreatment.trim().toLowerCase();
-      matchingItems = matchingItems.filter(item => {
-        const itemTreatment = (item.lens_model?.treatment || item.treatment || '').trim().toLowerCase();
-        return itemTreatment === targetLower;
-      });
+      matchingItems = matchingItems.filter(item => matchesLpTreatment(item, filterTreatment));
     }
 
     if (matchingItems.length === 0) return null;
@@ -543,9 +577,9 @@ const GradeOptica = ({ onOpenManualInsert }) => {
             onChange={(e) => setFilterTreatment(e.target.value)}
             style={{ color: 'black' }}
           >
-            <option value="">Todos os Tratamentos ({uniqueTreatments.length})</option>
-            {uniqueTreatments.map((treat, idx) => (
-              <option key={idx} value={treat}>{treat}</option>
+            <option value="">Todos os Tratamentos ({LP_TREATMENT_OPTIONS.length})</option>
+            {LP_TREATMENT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
             ))}
           </select>
         </div>

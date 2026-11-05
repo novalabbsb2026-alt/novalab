@@ -2,6 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { LensService, InventoryService } from '../services/api';
 import { ShieldAlert, MapPin, Eye, EyeOff, Search, Layers, Edit, Save, Plus, Minus, ShieldCheck, FileText, Sparkles, RefreshCw } from 'lucide-react';
 
+const GRADE_167_TREATMENT_OPTIONS = [
+  { key: '167_ar', label: '1.67 AR (Alto Indice 1.67 - AR)' },
+  { key: '167_fa', label: '1.67 FA (Alto Indice 1.67 - Filtro Azul AR)' },
+];
+
+const matches167Treatment = (item, filterKey) => {
+  if (!filterKey) return true;
+  const treatment = (item.lens_model?.treatment || item.treatment || 'AR').trim().toLowerCase();
+  if (filterKey === '167_ar') {
+    return ['ar', 'anti reflexo', 'antirreflexo', 'anti-reflexo', 'anti-reflexo ar', 'anti reflexo ar'].includes(treatment);
+  }
+  if (filterKey === '167_fa') {
+    return ['filtro azul ar', 'filtro azul', 'fa', 'blue cut', 'blue uv', 'blue', 'blue block'].includes(treatment);
+  }
+  return treatment === filterKey.toLowerCase();
+};
+
 const GradeLentes167 = ({ onOpenManualInsert }) => {
   const [models, setModels] = useState([]);
   const [selectedModelId, setSelectedModelId] = useState('');
@@ -109,13 +126,12 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
     });
 
     if (filterTreatment) {
-      // Filtra pelo tratamento do modelo selecionado via seu ID
-      matchingItems = matchingItems.filter(item => String(item.lens_model_id || item.lens_model?.id) === String(filterTreatment));
+      matchingItems = matchingItems.filter(item => matches167Treatment(item, filterTreatment));
     }
 
     if (matchingItems.length === 0) return null;
 
-    if (filterTreatment || selectedModelId) {
+    if (selectedModelId) {
       return matchingItems[0];
     }
 
@@ -364,16 +380,17 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
 
       <div style={{ marginBottom: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div className="form-group" style={{ flex: 1, minWidth: '280px' }}>
-          <label className="form-label">Filtrar por Tratamento (1.67)</label>
+          <label className="form-label">Filtrar por Tratamento</label>
           <select 
             className="form-control" 
             value={filterTreatment} 
-            onChange={(e) => { setFilterTreatment(e.target.value); setSelectedModelId(e.target.value ? e.target.value : ''); }}
+            onChange={(e) => setFilterTreatment(e.target.value)}
+            style={{ color: 'black' }}
           >
-            <option value="">Todas as Marcas e Tratamentos 1.67 (Visão Consolidada)</option>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.brand} — {m.material} ({m.treatment}) [ø{m.diameter}mm]
+            <option value="">Todos os Tratamentos ({GRADE_167_TREATMENT_OPTIONS.length})</option>
+            {GRADE_167_TREATMENT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
               </option>
             ))}
           </select>

@@ -2,9 +2,48 @@ import React, { useEffect, useState } from 'react';
 import { LensService, InventoryService } from '../services/api';
 import { Layers, Plus, Minus, Save, Edit, RefreshCw, X, ShieldAlert, Eye, EyeOff, Box, MapPin, Check, FileText } from 'lucide-react';
 
+const MF_ACB_TREATMENT_OPTIONS = [
+  { key: 'incolor_150', label: 'INCOLOR 1.50 (CR-39 - Incolor)' },
+  { key: 'ar_156', label: 'AR 1.56 (Resina - AR)' },
+  { key: 'filtro_azul_ar_156', label: 'FILTRO AZUL AR 1.56 (Resina - Filtro Azul AR)' },
+  { key: 'photo_ar_156', label: 'PHOTO AR 1.56 (Resina - Photo AR)' },
+  { key: 'photo_filtro_azul_ar_156', label: 'PHOTO FILTRO AZUL AR 1.56 (Resina - Photo Filtro Azul AR)' },
+  { key: '167_ar', label: '1.67 AR (Alto Indice 1.67 - AR)' },
+  { key: '167_fa', label: '1.67 FA (Alto Indice 1.67 - Filtro Azul AR)' },
+];
+
+const matchesMfAcbTreatment = (item, filterKey) => {
+  if (!filterKey) return true;
+  const model = item.lens_model || item.block_model || item;
+  const treatment = (model.treatment || item.treatment || 'Incolor').trim().toLowerCase();
+  const material = (model.material || item.material || '').trim().toLowerCase();
+  const refIdx = parseFloat(model.refractive_index || item.refractive_index || 1.56);
+  const is167 = Math.abs(refIdx - 1.67) < 0.02 || material.includes('1.67');
+
+  switch (filterKey) {
+    case 'incolor_150':
+      return ['incolor', 'sem tratamento', 'branco', 'incolor hc', 'padrao'].includes(treatment) && !is167;
+    case 'ar_156':
+      return ['ar', 'anti reflexo', 'antirreflexo', 'anti-reflexo', 'anti-reflexo ar', 'anti reflexo ar'].includes(treatment) && !is167;
+    case 'filtro_azul_ar_156':
+      return ['filtro azul ar', 'filtro azul', 'blue cut', 'blue uv', 'blue', 'blue block'].includes(treatment) && !is167;
+    case 'photo_ar_156':
+      return ['photo ar', 'fotossensivel', 'transitions', 'photo', 'foto'].includes(treatment) && !is167;
+    case 'photo_filtro_azul_ar_156':
+      return ['photo filtro azul ar', 'photo blue', 'photo filtro azul', 'transitions blue'].includes(treatment) && !is167;
+    case '167_ar':
+      return ['ar', 'anti reflexo', 'antirreflexo', 'anti-reflexo', 'anti-reflexo ar', 'anti reflexo ar'].includes(treatment) && is167;
+    case '167_fa':
+      return ['filtro azul ar', 'filtro azul', 'fa', 'blue cut', 'blue uv', 'blue', 'blue block'].includes(treatment) && is167;
+    default:
+      return treatment === filterKey.toLowerCase();
+  }
+};
+
 const GradeMultifocalAcabado = () => {
   const [models, setModels] = useState([]);
   const [selectedModelId, setSelectedModelId] = useState('');
+  const [filterTreatment, setFilterTreatment] = useState('');
   const [gridData, setGridData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCell, setSelectedCell] = useState(null);
@@ -90,8 +129,12 @@ const GradeMultifocalAcabado = () => {
   const verticalRange = Array.from(presentBases).sort((a, b) => a - b);
   const horizontalRange = Array.from(presentAdditions).sort((a, b) => a - b);
 
+  const activeGridData = filterTreatment
+    ? gridData.filter(item => matchesMfAcbTreatment(item, filterTreatment))
+    : gridData;
+
   const itemsMap = {};
-  gridData.forEach(item => {
+  activeGridData.forEach(item => {
     const rawBase = (item.base_curve !== null && item.base_curve !== undefined) 
       ? item.base_curve 
       : (item.spherical !== null && item.spherical !== undefined ? item.spherical : 0);
@@ -144,7 +187,7 @@ const GradeMultifocalAcabado = () => {
 
   let ruptureCount = 0;
   let criticalItems = [];
-  gridData.forEach(item => {
+  activeGridData.forEach(item => {
     if ((item.quantity_available || 0) <= 2) {
       ruptureCount++;
       criticalItems.push(item);
@@ -442,14 +485,14 @@ const GradeMultifocalAcabado = () => {
           </label>
           <select
             className="form-control"
-            value={selectedModelId}
-            onChange={(e) => setSelectedModelId(e.target.value)}
+            value={filterTreatment}
+            onChange={(e) => setFilterTreatment(e.target.value)}
             style={{ color: 'black' }}
           >
-            <option value="">Todas as Marcas e Tratamentos Multifocal Acabado (Visão Consolidada)</option>
-            {models.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.brand} — {m.material} ({m.treatment}) [Rota: {m.production_route || 'EXPRESSA_FACETAMENTO'}]
+            <option value="">Todos os Tratamentos ({MF_ACB_TREATMENT_OPTIONS.length})</option>
+            {MF_ACB_TREATMENT_OPTIONS.map(opt => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
               </option>
             ))}
           </select>
