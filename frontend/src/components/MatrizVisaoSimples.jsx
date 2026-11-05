@@ -18,13 +18,13 @@ const STANDARD_BASES = [
 ];
 
 const STANDARD_LENS_COLUMNS = [
-  { key: "incolor",              label: "INCOLOR",              filterLabel: "INCOLOR 1.50 (CR-39 - Incolor)",              treatments: ["incolor", "sem tratamento", "branco", "incolor hc", "padrao"], index167: false },
-  { key: "ar",                   label: "AR",                   filterLabel: "AR 1.56 (Resina - AR)",                       treatments: ["ar", "anti reflexo", "antirreflexo", "anti-reflexo", "anti-reflexo ar", "anti reflexo ar", "crizal", "trio"], index167: false },
-  { key: "filtro_azul_ar",       label: "FILTRO AZUL AR",       filterLabel: "FILTRO AZUL AR 1.56 (Resina - Filtro Azul AR)", treatments: ["filtro azul ar", "filtro azul", "blue cut", "blue uv", "blue", "blue block"], index167: false },
-  { key: "photo_ar",             label: "PHOTO AR",             filterLabel: "PHOTO AR 1.56 (Resina - Photo AR)",           treatments: ["photo ar", "fotossensivel", "transitions", "photo", "foto"], index167: false },
-  { key: "photo_filtro_azul_ar", label: "PHOTO FILTRO AZUL AR", filterLabel: "PHOTO FILTRO AZUL AR 1.56 (Resina - Photo Filtro Azul AR)", treatments: ["photo filtro azul ar", "photo blue", "photo filtro azul", "transitions blue"], index167: false },
-  { key: "lens_167_ar",          label: "1.67 AR",              filterLabel: "1.67 AR (Alto Indice 1.67 - AR)",             treatments: ["ar", "anti reflexo", "antirreflexo", "anti-reflexo ar"], index167: true  },
-  { key: "lens_167_fa",          label: "1.67 FA",              filterLabel: "1.67 FA (Alto Indice 1.67 - Filtro Azul AR)", treatments: ["filtro azul ar", "filtro azul", "blue cut", "blue uv"], index167: true  },
+  { key: "incolor",              label: "INCOLOR",              treatments: ["incolor", "sem tratamento", "branco", "incolor hc", "padrao"], index167: false },
+  { key: "ar",                   label: "AR",                   treatments: ["ar", "anti reflexo", "antirreflexo", "anti-reflexo", "anti-reflexo ar", "anti reflexo ar", "crizal", "trio"], index167: false },
+  { key: "filtro_azul_ar",       label: "FILTRO AZUL AR",       treatments: ["filtro azul ar", "filtro azul", "blue cut", "blue uv", "blue", "blue block"], index167: false },
+  { key: "photo_ar",             label: "PHOTO AR",             treatments: ["photo ar", "fotossensivel", "transitions", "photo", "foto"], index167: false },
+  { key: "photo_filtro_azul_ar", label: "PHOTO FILTRO AZUL AR", treatments: ["photo filtro azul ar", "photo blue", "photo filtro azul", "transitions blue"], index167: false },
+  { key: "lens_167_ar",          label: "1.67 AR",              treatments: ["ar", "anti reflexo", "antirreflexo", "anti-reflexo ar"], index167: true  },
+  { key: "lens_167_fa",          label: "1.67 FA",              treatments: ["filtro azul ar", "filtro azul", "blue cut", "blue uv"], index167: true  },
 ];
 
 function getColumnKeyForItem(item, allColumns) {
@@ -374,12 +374,11 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
             className="form-control"
             value={filterColKey}
             onChange={e => setFilterColKey(e.target.value)}
-            style={{ color: 'black' }}
           >
-            <option value="">Todos os Tratamentos ({columns.length})</option>
+            <option value="">Todos os Tratamentos (Visão Consolidada)</option>
             {columns.map(col => (
               <option key={col.key} value={col.key}>
-                {col.filterLabel || col.label} {col.isCustom ? '(Personalizado)' : ''}
+                {col.label} {col.isCustom ? '(Personalizado)' : ''}
               </option>
             ))}
           </select>
