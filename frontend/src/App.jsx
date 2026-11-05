@@ -43,7 +43,7 @@ import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarC
 
 
 function App() {
-  const [activeTab, setActiveTab] = useState('grid');
+  const [activeTab, setActiveTab] = useState('relatorios-bi');
   const [selectedOSIdForModal, setSelectedOSIdForModal] = useState(null);
   const [toast, setToast] = useState(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -161,6 +161,7 @@ function App() {
 
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
+    setActiveTab('relatorios-bi');
   };
 
   const handleLogout = () => {
@@ -168,7 +169,7 @@ function App() {
     localStorage.removeItem('factory_user_role');
     localStorage.removeItem('factory_user_name');
     setCurrentUser(null);
-    setActiveTab('dashboard');
+    setActiveTab('relatorios-bi');
   };
 
   // Configura interceptores do axios para injetar o JWT e tratar 401

@@ -9,7 +9,7 @@ import TabComercial from './TabComercial';
 import TabFinanceiro from './TabFinanceiro';
 
 export default function RelatoriosHub({ currentUser }) {
-  const [activeTab, setActiveTab] = useState('comercial'); // 'producao' | 'estoque' | 'comercial' | 'financeiro'
+  const [activeTab, setActiveTab] = useState('estoque'); // 'producao' | 'estoque' | 'comercial' | 'financeiro'
 
   const isAdmin = currentUser?.role === 'Administrador' || currentUser?.role?.name === 'Administrador';
 
