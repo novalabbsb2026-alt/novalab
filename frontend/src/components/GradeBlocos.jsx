@@ -5,6 +5,7 @@ import { Layers, Plus, Save, Edit, RefreshCw, X, ShieldAlert, Eye, EyeOff, Box, 
 const GradeBlocos = () => {
   const [models, setModels] = useState([]);
   const [selectedModelId, setSelectedModelId] = useState('');
+  const [filterTreatment, setFilterTreatment] = useState('');
   const [matrixData, setMatrixData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedCell, setSelectedCell] = useState(null);
@@ -283,7 +284,13 @@ const GradeBlocos = () => {
       const itemsList = targetMapItem.items || [targetMapItem];
       const sideItems = itemsList.filter(i => {
         const itemEye = (i.eye || i.eye_side || 'OD').toString().toUpperCase().trim();
-        return (itemEye.includes('E') || itemEye === 'OE') === (sideNorm === 'OE');
+        const matchesSide = (itemEye.includes('E') || itemEye === 'OE') === (sideNorm === 'OE');
+        if (!matchesSide) return false;
+        if (filterTreatment) {
+          const itemTreatment = (i.treatment || i.lens_model?.treatment || '').trim().toLowerCase();
+          return itemTreatment === filterTreatment.trim().toLowerCase();
+        }
+        return true;
       });
 
       const totalQty = sideItems.reduce((sum, i) => sum + (i.quantity_available || 0), 0);
@@ -292,7 +299,7 @@ const GradeBlocos = () => {
         eye_side: sideNorm,
         quantity_available: totalQty,
         items: sideItems,
-        location_tag: `${sideItems.length} Mod.`
+        location_tag: sideItems.length > 0 ? `${sideItems.length} Mod.` : ''
       };
     }
 
@@ -464,6 +471,31 @@ const GradeBlocos = () => {
     printWindow.document.close();
   };
 
+  // Lista deduplicada case-insensitive de tratamentos de multifocal (idêntico à lógica de Visão Simples LP)
+  const uniqueTreatmentsMap = new Map();
+  models.forEach(m => {
+    if (m.treatment && m.treatment.trim()) {
+      const raw = m.treatment.trim();
+      const key = raw.toLowerCase();
+      if (!uniqueTreatmentsMap.has(key)) {
+        uniqueTreatmentsMap.set(key, raw);
+      }
+    }
+  });
+  Object.values(itemsMap).forEach(cell => {
+    (cell.items || []).forEach(sub => {
+      const treat = sub.treatment || sub.lens_model?.treatment;
+      if (treat && treat.trim()) {
+        const raw = treat.trim();
+        const key = raw.toLowerCase();
+        if (!uniqueTreatmentsMap.has(key)) {
+          uniqueTreatmentsMap.set(key, raw);
+        }
+      }
+    });
+  });
+  const uniqueTreatments = Array.from(uniqueTreatmentsMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
   return (
     <div className="glass-panel" style={{ width: '100%' }}>
       
@@ -556,14 +588,14 @@ const GradeBlocos = () => {
           </label>
           <select
             className="form-control"
-            value={selectedModelId}
-            onChange={(e) => setSelectedModelId(e.target.value)}
+            value={filterTreatment}
+            onChange={(e) => setFilterTreatment(e.target.value)}
             style={{ color: 'black' }}
           >
-            <option value="">Todas as Marcas e Tratamentos Multifocal (Visão Consolidada)</option>
-            {models.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.brand} — {m.material} ({m.treatment}) [Rota: {m.production_route || 'SURFACAGEM_CNC'}]
+            <option value="">Todos os Tratamentos ({uniqueTreatments.length})</option>
+            {uniqueTreatments.map((treat, idx) => (
+              <option key={idx} value={treat}>
+                {treat}
               </option>
             ))}
           </select>
