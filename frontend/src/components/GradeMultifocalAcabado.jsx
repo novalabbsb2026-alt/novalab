@@ -5,6 +5,7 @@ import { Layers, Plus, Minus, Save, Edit, RefreshCw, X, ShieldAlert, Eye, EyeOff
 const GradeMultifocalAcabado = () => {
   const [models, setModels] = useState([]);
   const [selectedModelId, setSelectedModelId] = useState('');
+  const [filterTreatment, setFilterTreatment] = useState('');
   const [gridData, setGridData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCell, setSelectedCell] = useState(null);
@@ -126,7 +127,26 @@ const GradeMultifocalAcabado = () => {
     const key = `${bStr}_${aStr}_${sideNorm}`;
 
     if (itemsMap[key]) {
-      return itemsMap[key];
+      const itemsList = itemsMap[key].items || [];
+      const sideItems = itemsList.filter(i => {
+        const itemEye = (i.eye || i.eye_side || 'OD').toString().toUpperCase().trim();
+        const matchesSide = (itemEye.includes('E') || itemEye === 'OE') === (sideNorm === 'OE');
+        if (!matchesSide) return false;
+        if (filterTreatment) {
+          const itemTreatment = (i.treatment || i.lens_model?.treatment || '').trim().toLowerCase();
+          return itemTreatment === filterTreatment.trim().toLowerCase();
+        }
+        return true;
+      });
+
+      const totalQty = sideItems.reduce((sum, i) => sum + (i.quantity_available || 0), 0);
+      return {
+        ...itemsMap[key],
+        eye_side: sideNorm,
+        quantity_available: totalQty,
+        items: sideItems,
+        location_tag: sideItems.length > 0 ? `${sideItems.length} Mod.` : ''
+      };
     }
 
     return {
@@ -349,6 +369,29 @@ const GradeMultifocalAcabado = () => {
     printWindow.document.close();
   };
 
+  // Lista deduplicada case-insensitive de tratamentos de Multifocal Acabado (idêntico à lógica de Visão Simples LP)
+  const uniqueTreatmentsMap = new Map();
+  models.forEach(m => {
+    if (m.treatment && m.treatment.trim()) {
+      const raw = m.treatment.trim();
+      const key = raw.toLowerCase();
+      if (!uniqueTreatmentsMap.has(key)) {
+        uniqueTreatmentsMap.set(key, raw);
+      }
+    }
+  });
+  gridData.forEach(item => {
+    const treat = item.lens_model?.treatment || item.treatment;
+    if (treat && treat.trim()) {
+      const raw = treat.trim();
+      const key = raw.toLowerCase();
+      if (!uniqueTreatmentsMap.has(key)) {
+        uniqueTreatmentsMap.set(key, raw);
+      }
+    }
+  });
+  const uniqueTreatments = Array.from(uniqueTreatmentsMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
   return (
     <div className="glass-panel" style={{ width: '100%' }}>
       
@@ -441,14 +484,14 @@ const GradeMultifocalAcabado = () => {
           </label>
           <select
             className="form-control"
-            value={selectedModelId}
-            onChange={(e) => setSelectedModelId(e.target.value)}
+            value={filterTreatment}
+            onChange={(e) => setFilterTreatment(e.target.value)}
             style={{ color: 'black' }}
           >
-            <option value="">Todas as Marcas e Tratamentos Multifocal Acabado (Visão Consolidada)</option>
-            {models.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.brand} — {m.material} ({m.treatment}) [Rota: {m.production_route || 'EXPRESSA_FACETAMENTO'}]
+            <option value="">Todos os Tratamentos ({uniqueTreatments.length})</option>
+            {uniqueTreatments.map((treat, idx) => (
+              <option key={idx} value={treat}>
+                {treat}
               </option>
             ))}
           </select>
