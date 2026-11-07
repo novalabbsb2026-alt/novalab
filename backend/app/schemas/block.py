@@ -38,8 +38,8 @@ class BlockGridItemResponse(BaseModel):
     addition: float
     eye_side: str
     quantity_available: int
-    quantity_reserved: int
-    min_stock: int
+    quantity_reserved: Optional[int] = 0
+    min_stock: int = 2
     barcode: Optional[str] = None
     location_tag: Optional[str] = None
     updated_at: Optional[datetime] = None

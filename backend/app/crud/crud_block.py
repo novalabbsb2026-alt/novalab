@@ -284,6 +284,7 @@ async def update_grid_item(db: AsyncSession, item_id: uuid.UUID, data: BlockGrid
         addition=inv_item.addition or Decimal("0.00"),
         eye_side=inv_item.eye or "OD",
         quantity_available=inv_item.quantity_available or 0,
+        quantity_reserved=inv_item.reserved_quantity or 0,
         min_stock=data.min_stock or 2,
         barcode=inv_item.barcode,
         location_tag=inv_item.location_tag
@@ -319,6 +320,7 @@ async def increment_by_barcode(db: AsyncSession, barcode: str, quantity: int = 1
         addition=inv_item.addition or Decimal("0.00"),
         eye_side=inv_item.eye or "OD",
         quantity_available=inv_item.quantity_available or 0,
+        quantity_reserved=inv_item.reserved_quantity or 0,
         min_stock=2,
         barcode=inv_item.barcode,
         location_tag=inv_item.location_tag
