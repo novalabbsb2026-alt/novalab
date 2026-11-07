@@ -200,12 +200,24 @@ const GradeBlocos = () => {
     if (!editingItemId) return;
     setUpdatingCell(true);
     try {
-      await BlockService.updateGridItem(editingItemId, {
+      const payload = {
         quantity_available: parseInt(editQty, 10),
         min_stock: parseInt(editMinStock, 10),
         location_tag: editLocation,
         barcode: editBarcode
-      });
+      };
+
+      try {
+        await BlockService.updateGridItem(editingItemId, payload);
+      } catch (errBlock) {
+        // Fallback direto via InventoryService caso necessário
+        await InventoryService.update(editingItemId, {
+          quantity_available: parseInt(editQty, 10),
+          location_tag: editLocation || null,
+          barcode: editBarcode || null
+        });
+      }
+
       setEditingItemId(null);
       await loadMatrix(selectedModelId);
 

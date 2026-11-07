@@ -240,36 +240,86 @@ async def get_grid_matrix_data(db: AsyncSession, model_id: uuid.UUID) -> Dict[st
         "total_items": len(items)
     }
 
-async def update_grid_item(db: AsyncSession, item_id: uuid.UUID, data: BlockGridItemUpdate) -> Optional[BlockGridItem]:
+async def update_grid_item(db: AsyncSession, item_id: uuid.UUID, data: BlockGridItemUpdate) -> Optional[Any]:
     """Atualiza quantidade, estoque mínimo, código de barras ou localização de um item da grade."""
     res = await db.execute(select(BlockGridItem).where(BlockGridItem.id == item_id))
     item = res.scalars().first()
-    if not item:
+    if item:
+        if data.quantity_available is not None:
+            item.quantity_available = max(0, data.quantity_available)
+        if data.min_stock is not None:
+            item.min_stock = max(0, data.min_stock)
+        if data.barcode is not None:
+            item.barcode = data.barcode.strip() if data.barcode else None
+        if data.location_tag is not None:
+            item.location_tag = data.location_tag.strip() if data.location_tag else None
+
+        db.add(item)
+        await db.commit()
+        await db.refresh(item)
+        return item
+
+    # Se não localizado em BlockGridItem, verifica na tabela unificada de estoque (inventory_items / LensInventoryGrade)
+    from backend.app.models.lens import LensInventoryGrade
+    inv_res = await db.execute(select(LensInventoryGrade).where(LensInventoryGrade.id == item_id))
+    inv_item = inv_res.scalars().first()
+    if not inv_item:
         return None
 
     if data.quantity_available is not None:
-        item.quantity_available = max(0, data.quantity_available)
-    if data.min_stock is not None:
-        item.min_stock = max(0, data.min_stock)
+        inv_item.quantity_available = max(0, data.quantity_available)
     if data.barcode is not None:
-        item.barcode = data.barcode.strip() if data.barcode else None
+        inv_item.barcode = data.barcode.strip() if data.barcode else None
     if data.location_tag is not None:
-        item.location_tag = data.location_tag.strip() if data.location_tag else None
+        inv_item.location_tag = data.location_tag.strip() if data.location_tag else None
 
-    db.add(item)
+    db.add(inv_item)
     await db.commit()
-    await db.refresh(item)
-    return item
+    await db.refresh(inv_item)
 
-async def increment_by_barcode(db: AsyncSession, barcode: str, quantity: int = 1) -> Optional[BlockGridItem]:
+    return BlockGridItem(
+        id=inv_item.id,
+        block_model_id=inv_item.lens_model_id,
+        base_curve=inv_item.base_curve or Decimal("0.00"),
+        addition=inv_item.addition or Decimal("0.00"),
+        eye_side=inv_item.eye or "OD",
+        quantity_available=inv_item.quantity_available or 0,
+        min_stock=data.min_stock or 2,
+        barcode=inv_item.barcode,
+        location_tag=inv_item.location_tag
+    )
+
+async def increment_by_barcode(db: AsyncSession, barcode: str, quantity: int = 1) -> Optional[Any]:
     """Incrementa a quantidade disponível de um bloco através de código de barras bipado."""
-    res = await db.execute(select(BlockGridItem).where(BlockGridItem.barcode == barcode.strip()))
+    b_clean = barcode.strip()
+    res = await db.execute(select(BlockGridItem).where(BlockGridItem.barcode == b_clean))
     item = res.scalars().first()
-    if not item:
+    if item:
+        item.quantity_available += quantity
+        db.add(item)
+        await db.commit()
+        await db.refresh(item)
+        return item
+
+    from backend.app.models.lens import LensInventoryGrade
+    inv_res = await db.execute(select(LensInventoryGrade).where(LensInventoryGrade.barcode == b_clean))
+    inv_item = inv_res.scalars().first()
+    if not inv_item:
         return None
 
-    item.quantity_available += quantity
-    db.add(item)
+    inv_item.quantity_available = (inv_item.quantity_available or 0) + quantity
+    db.add(inv_item)
     await db.commit()
-    await db.refresh(item)
-    return item
+    await db.refresh(inv_item)
+
+    return BlockGridItem(
+        id=inv_item.id,
+        block_model_id=inv_item.lens_model_id,
+        base_curve=inv_item.base_curve or Decimal("0.00"),
+        addition=inv_item.addition or Decimal("0.00"),
+        eye_side=inv_item.eye or "OD",
+        quantity_available=inv_item.quantity_available or 0,
+        min_stock=2,
+        barcode=inv_item.barcode,
+        location_tag=inv_item.location_tag
+    )
