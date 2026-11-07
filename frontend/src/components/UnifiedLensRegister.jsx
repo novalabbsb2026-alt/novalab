@@ -36,6 +36,7 @@ const PRESET_OPTIONS = {
     { name: "Bloco MF INCOLOR 1.50", index: 1.50, material: "CR-39", treatment: "Incolor", route: "SURFACAGEM_CNC" },
     { name: "Bloco MF AR 1.56", index: 1.56, material: "Resina", treatment: "AR", route: "SURFACAGEM_CNC" },
     { name: "Bloco MF FILTRO AZUL AR 1.56", index: 1.56, material: "Resina", treatment: "Filtro Azul AR", route: "SURFACAGEM_CNC" },
+    { name: "Bloco MF PHOTO 1.56", index: 1.56, material: "Resina", treatment: "Photo", route: "SURFACAGEM_CNC" },
     { name: "Bloco MF PHOTO AR 1.56", index: 1.56, material: "Resina", treatment: "Photo AR", route: "SURFACAGEM_CNC" },
     { name: "Bloco MF PHOTO FILTRO AZUL AR 1.56", index: 1.56, material: "Resina", treatment: "Photo Filtro Azul AR", route: "SURFACAGEM_CNC" },
     { name: "Bloco MF 1.67 AR", index: 1.67, material: "Alto Índice 1.67", treatment: "AR", route: "SURFACAGEM_CNC" },
