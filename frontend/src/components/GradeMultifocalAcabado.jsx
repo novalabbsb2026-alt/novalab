@@ -163,10 +163,26 @@ const GradeMultifocalAcabado = () => {
 
   let ruptureCount = 0;
   let criticalItems = [];
-  gridData.forEach(item => {
-    if ((item.quantity_available || 0) <= 2) {
+  Object.keys(itemsMap).forEach(key => {
+    const cellData = itemsMap[key];
+    let itemsList = cellData.items || [cellData];
+    if (filterTreatment) {
+      itemsList = itemsList.filter(i => {
+        const treat = (i.treatment || i.lens_model?.treatment || '').trim().toLowerCase();
+        return treat === filterTreatment.trim().toLowerCase();
+      });
+      if (itemsList.length === 0) return;
+    }
+    const totalQty = itemsList.reduce((sum, i) => sum + (i.quantity_available || 0), 0);
+    if (totalQty <= 2) {
       ruptureCount++;
-      criticalItems.push(item);
+      const brands = Array.from(new Set(itemsList.map(i => i.brand || i.lens_model?.brand || i.lens_model?.name).filter(Boolean))).join(', ');
+      criticalItems.push({
+        ...cellData,
+        brand: brands || 'Consolidado',
+        quantity_available: totalQty,
+        items: itemsList
+      });
     }
   });
 
@@ -444,7 +460,7 @@ const GradeMultifocalAcabado = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShieldAlert size={20} color="#dc2626" />
-            <span>Atenção: Existem <strong>{ruptureCount} células de lentes</strong> em nível Crítico (1-2 un) ou Ruptura (0 un).</span>
+            <span>Atenção: Existem <strong>{ruptureCount} células de lentes</strong> em nível Crítico (1-2 un) ou Ruptura (0 un) considerando o saldo consolidado de todas as marcas.</span>
           </div>
           <button style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>
             Ver Lentes no Alerta ➔
@@ -832,17 +848,17 @@ const GradeMultifocalAcabado = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {gridData.filter(i => (i.quantity_available || 0) <= 2).length === 0 ? (
+                    {criticalItems.length === 0 ? (
                       <tr>
                         <td colSpan="6" style={{ padding: '16px', textAlign: 'center', color: 'hsl(var(--text-muted))' }}>
                           Nenhuma dioptria crítica encontrada para o filtro atual.
                         </td>
                       </tr>
                     ) : (
-                      gridData.filter(i => (i.quantity_available || 0) <= 2).map((item, idx) => (
+                      criticalItems.map((item, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-glass)' }}>
                           <td style={{ padding: '10px', fontWeight: 600 }}>
-                            {item.lens_model?.brand || item.brand || 'Multifocal'} ({item.lens_model?.treatment || 'Incolor'})
+                            {item.brand || item.lens_model?.brand || 'Multifocal Acabado'}
                           </td>
                           <td style={{ padding: '10px' }}>Base {parseFloat(item.base_curve || item.spherical || 0).toFixed(2)}</td>
                           <td style={{ padding: '10px' }}>+{parseFloat(item.addition || item.cylindrical || 0).toFixed(2)}</td>

@@ -267,13 +267,6 @@ const GradeBlocos = () => {
     const qty = item.quantity_available !== undefined ? item.quantity_available : 0;
     if (qty === 0) return 'lens-cell empty';
 
-    if (item.isConsolidated && item.items && item.items.length > 0) {
-      const hasRupture = item.items.some(i => (i.quantity_available || 0) <= 2);
-      const hasAlert = item.items.some(i => (i.quantity_available || 0) >= 3 && (i.quantity_available || 0) <= 4);
-      if (hasRupture) return 'lens-cell rupture';
-      if (hasAlert) return 'lens-cell alert';
-    }
-
     if (qty >= 1 && qty <= 2) return 'lens-cell rupture';
     if (qty >= 3 && qty <= 4) return 'lens-cell alert';
     return 'lens-cell normal';
@@ -331,16 +324,24 @@ const GradeBlocos = () => {
   let criticalBlockItems = [];
 
   Object.values(itemsMap).forEach(item => {
-    if (item.isConsolidated && item.items) {
-      item.items.forEach(sub => {
-        if ((sub.quantity_available || 0) <= 2) {
-          ruptureCount++;
-          criticalBlockItems.push(sub);
-        }
+    let itemsList = item.items || [item];
+    if (filterTreatment) {
+      itemsList = itemsList.filter(sub => {
+        const treat = (sub.treatment || sub.block_model?.treatment || '').trim().toLowerCase();
+        return treat === filterTreatment.trim().toLowerCase();
       });
-    } else if ((item.quantity_available || 0) <= 2) {
+      if (itemsList.length === 0) return;
+    }
+    const totalQty = itemsList.reduce((sum, sub) => sum + (sub.quantity_available || 0), 0);
+    if (totalQty <= 2) {
       ruptureCount++;
-      criticalBlockItems.push(item);
+      const modelsNames = Array.from(new Set(itemsList.map(s => s.block_model?.name || s.brand).filter(Boolean))).join(', ');
+      criticalBlockItems.push({
+        ...item,
+        quantity_available: totalQty,
+        brand: modelsNames || item.brand || 'Consolidado',
+        items: itemsList
+      });
     }
   });
 
@@ -560,7 +561,7 @@ const GradeBlocos = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShieldAlert size={20} color="#dc2626" />
-            <span>Atenção: Existem <strong>{ruptureCount} células de blocos</strong> em nível Crítico (1-2 un) ou Ruptura (0 un).</span>
+            <span>Atenção: Existem <strong>{ruptureCount} células de blocos</strong> em nível Crítico (1-2 un) ou Ruptura (0 un) considerando o saldo consolidado de todas as marcas.</span>
           </div>
           <button style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>
             Ver Blocos no Alerta ➔

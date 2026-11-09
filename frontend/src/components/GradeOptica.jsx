@@ -212,16 +212,6 @@ const GradeOptica = ({ onOpenManualInsert }) => {
     if (!item) return 'lens-cell empty';
     const qty = item.quantity_available !== undefined ? item.quantity_available : 0;
     if (qty === 0) return 'lens-cell rupture';
-
-    if (item.isConsolidated && item.items && item.items.length > 0) {
-      const hasRupture = item.items.some(i => (i.quantity_available || 0) === 0);
-      const hasCritical = item.items.some(i => (i.quantity_available || 0) >= 1 && (i.quantity_available || 0) <= 2);
-      const hasLow = item.items.some(i => (i.quantity_available || 0) >= 3 && (i.quantity_available || 0) <= 4);
-      if (hasRupture) return 'lens-cell rupture';
-      if (hasCritical) return 'lens-cell critical';
-      if (hasLow) return 'lens-cell low';
-    }
-
     if (qty >= 1 && qty <= 2) return 'lens-cell critical';
     if (qty >= 3 && qty <= 4) return 'lens-cell low';
     return 'lens-cell normal';
@@ -335,10 +325,51 @@ const GradeOptica = ({ onOpenManualInsert }) => {
   });
   const uniqueTreatments = Array.from(uniqueTreatmentsMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
+  // Dioptrias consolidadas independente de fornecedor
+  const consolidatedDiopters = React.useMemo(() => {
+    const map = new Map();
+    gridData.forEach(item => {
+      const mType = item.lens_model?.matrix_type;
+      if (mType && mType !== 'LP_GRADE') return;
+      if (selectedModelId && String(item.lens_model_id) !== String(selectedModelId)) return;
+      if (filterTreatment) {
+        const itemTreatment = (item.lens_model?.treatment || item.treatment || '').trim().toLowerCase();
+        if (itemTreatment !== filterTreatment.trim().toLowerCase()) return;
+      }
+      const sph = parseFloat(item.spherical).toFixed(2);
+      const cyl = parseFloat(item.cylindrical).toFixed(2);
+      const key = `${sph}_${cyl}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: `diopter_${key}`,
+          spherical: sph,
+          cylindrical: cyl,
+          quantity_available: 0,
+          items: [],
+          models: new Set(),
+          location_tag: item.location_tag || ''
+        });
+      }
+      const entry = map.get(key);
+      entry.quantity_available += (item.quantity_available || 0);
+      entry.items.push(item);
+      const brand = item.lens_model?.brand || item.lens_model?.name;
+      if (brand) entry.models.add(brand);
+      if (item.location_tag && !entry.location_tag) entry.location_tag = item.location_tag;
+    });
+    return Array.from(map.values()).map(d => ({
+      ...d,
+      brand: Array.from(d.models).join(', ') || 'Todas as Marcas',
+      treatment: filterTreatment || (d.items[0]?.lens_model?.treatment || d.items[0]?.treatment || 'Padrão'),
+      barcode: d.items.map(i => i.barcode).filter(Boolean).slice(0, 2).join(' / ') || 'Consolidado'
+    }));
+  }, [gridData, selectedModelId, filterTreatment]);
+
+  const criticalDiopters = consolidatedDiopters.filter(d => d.quantity_available <= 2);
+
   const handleExportPDF = (itemsList = null) => {
-    const criticalItems = gridData.filter(i => (i.quantity_available || 0) <= 2);
-    const itemsToExport = itemsList || criticalItems;
-    const modelName = selectedModel ? `${selectedModel.brand} - ${selectedModel.name}` : 'Todas as Marcas e Modelos';
+    const itemsToExport = itemsList || criticalDiopters;
+    const modelName = selectedModel ? `${selectedModel.brand} - ${selectedModel.name}` : 'Todas as Marcas e Modelos (Consolidado)';
     const nowStr = new Date().toLocaleString('pt-BR');
 
     const printWindow = window.open('', '_blank', 'width=950,height=750');
@@ -465,14 +496,14 @@ const GradeOptica = ({ onOpenManualInsert }) => {
         </div>
       </div>
 
-      {gridData.some(i => (i.quantity_available !== undefined ? i.quantity_available : 0) <= 2) && (
+      {criticalDiopters.length > 0 && (
         <div 
           onClick={() => setShowRuptureAlertModal(true)}
           style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#dc2626', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', transition: 'all 0.2s ease-in-out' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShieldAlert size={20} color="#dc2626" />
-            <span>Atenção: Existem <strong>{gridData.filter(i => (i.quantity_available || 0) <= 2).length} dioptrias</strong> em nível Crítico (1-2 un) ou Ruptura (0 un).</span>
+            <span>Atenção: Existem <strong>{criticalDiopters.length} dioptrias</strong> em nível Crítico (1-2 un) ou Ruptura (0 un) considerando o saldo consolidado de todas as marcas.</span>
           </div>
           <button style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>
             Ver Lentes no Alerta ➔
@@ -969,10 +1000,10 @@ const GradeOptica = ({ onOpenManualInsert }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {gridData.filter(i => (i.quantity_available || 0) <= 2).map(item => (
+                  {criticalDiopters.map(item => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px', fontWeight: 600 }}>
-                        {item.lens_model ? `${item.lens_model.brand} - ${item.lens_model.treatment}` : 'Lente Matriz'}
+                        {item.brand}
                       </td>
                       <td style={{ padding: '10px', fontWeight: 700 }}>
                         {parseFloat(item.spherical) > 0 ? `+${parseFloat(item.spherical).toFixed(2)}` : parseFloat(item.spherical).toFixed(2)}
@@ -994,7 +1025,7 @@ const GradeOptica = ({ onOpenManualInsert }) => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-              <button className="btn btn-primary" onClick={() => handleExportPDF(gridData.filter(i => (i.quantity_available || 0) <= 2))} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+              <button className="btn btn-primary" onClick={() => handleExportPDF(criticalDiopters)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
                 <FileText size={16} /> Exportar Relatório em PDF
               </button>
               <button className="btn btn-secondary" onClick={() => setShowRuptureAlertModal(false)}>

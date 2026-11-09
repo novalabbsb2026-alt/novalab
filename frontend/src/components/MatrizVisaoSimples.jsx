@@ -3,7 +3,7 @@ import {
   Layers, Save, CheckCircle2, RefreshCw, Plus, Minus, PackageCheck,
   Sparkles, Eye, EyeOff, Info, ShieldAlert, FileText, Box, Edit, X
 } from "lucide-react";
-import api, { InventoryService } from "../services/api";
+import api, { InventoryService, LensService } from "../services/api";
 
 // ============================================================
 // CONFIGURACAO DA GRADE BLOCO VISAO SIMPLES
@@ -154,29 +154,35 @@ function buildMatrix(items, allColumns, allBases) {
 // ============================================================
 export default function MatrizVisaoSimples({ onOpenManualInsert }) {
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [columns,       setColumns]          = useState(STANDARD_LENS_COLUMNS);
-  const [bases,         setBases]            = useState(STANDARD_BASES);
-  const [gridMatrix,    setGridMatrix]       = useState({});
-  const [loading,       setLoading]          = useState(false);
-  const [showFullRange, setShowFullRange]    = useState(true);
+  const [models,         setModels]          = useState([]);
+  const [columns,        setColumns]         = useState(STANDARD_LENS_COLUMNS);
+  const [bases,          setBases]           = useState(STANDARD_BASES);
+  const [gridMatrix,     setGridMatrix]      = useState({});
+  const [loading,        setLoading]         = useState(false);
+  const [showFullRange,  setShowFullRange]   = useState(true);
   const [showRuptureAlertModal, setShowRuptureAlertModal] = useState(false);
-  const [selectedCell,  setSelectedCell]     = useState(null);
-  const [editingItemId, setEditingItemId]    = useState(null);
-  const [editQty,       setEditQty]          = useState(0);
-  const [editLocation,  setEditLocation]     = useState("");
-  const [updating,      setUpdating]         = useState(false);
-  const [updateError,   setUpdateError]      = useState(null);
+  const [selectedCell,   setSelectedCell]    = useState(null);
+  const [editingItemId,  setEditingItemId]   = useState(null);
+  const [editQty,        setEditQty]         = useState(0);
+  const [editLocation,   setEditLocation]    = useState("");
+  const [updating,       setUpdating]        = useState(false);
+  const [updateError,    setUpdateError]     = useState(null);
   // Filtros
-  const [searchBase,    setSearchBase]       = useState('');
-  const [filterColKey,  setFilterColKey]     = useState('');
+  const [searchBase,      setSearchBase]      = useState('');
+  const [filterTreatment, setFilterTreatment] = useState('');
 
   useEffect(() => { loadInventory(); }, []);
 
   const loadInventory = async () => {
     setLoading(true);
     try {
-      const res = await InventoryService.getGrid(null);
+      const [res, modelsRes] = await Promise.all([
+        InventoryService.getGrid(null),
+        LensService.getModels().catch(() => ({ data: [] }))
+      ]);
       const bvs = (res.data || []).filter(it => it.lens_model?.matrix_type === "BLOCO_VS");
+      const bvsModels = (modelsRes.data || []).filter(m => m.matrix_type === "BLOCO_VS");
+      setModels(bvsModels);
       const dynCols = computeDynamicColumns(bvs);
       const dynBases = computeDynamicBases(bvs);
       setColumns(dynCols);
@@ -190,28 +196,59 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
     }
   };
 
-  const cell  = (bk, ck) => gridMatrix[bk]?.[ck] || { qty: 0, items: [] };
+  // Lista deduplicada case-insensitive de tratamentos (idêntico à lógica de Visão Simples LP)
+  const uniqueTreatmentsMap = new Map();
+  models.forEach(m => {
+    if (m.treatment && m.treatment.trim()) {
+      const raw = m.treatment.trim();
+      const key = raw.toLowerCase();
+      if (!uniqueTreatmentsMap.has(key)) {
+        uniqueTreatmentsMap.set(key, raw);
+      }
+    }
+  });
+  inventoryItems.forEach(item => {
+    const treat = item.lens_model?.treatment || item.treatment;
+    if (treat && treat.trim()) {
+      const raw = treat.trim();
+      const key = raw.toLowerCase();
+      if (!uniqueTreatmentsMap.has(key)) {
+        uniqueTreatmentsMap.set(key, raw);
+      }
+    }
+  });
+  const uniqueTreatments = Array.from(uniqueTreatmentsMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  const cell = (bk, ck) => {
+    const raw = gridMatrix[bk]?.[ck] || { qty: 0, items: [] };
+    if (!filterTreatment) return raw;
+    const targetLower = filterTreatment.trim().toLowerCase();
+    const filtered = (raw.items || []).filter(it => {
+      const treat = (it.lens_model?.treatment || it.treatment || "").trim().toLowerCase();
+      return treat === targetLower || targetLower.includes(treat) || treat.includes(targetLower);
+    });
+    return {
+      qty: filtered.reduce((acc, curr) => acc + (curr.quantity_available || 0), 0),
+      items: filtered
+    };
+  };
+
   const cellQ = (bk, ck) => cell(bk, ck).qty;
   const cellI = (bk, ck) => cell(bk, ck).items;
 
-  const rowTotal   = bk => columns.reduce((a, c) => a + cellQ(bk, c.key), 0);
+  const rowTotal   = bk => visibleColumns.reduce((a, c) => a + cellQ(bk, c.key), 0);
   const colTotal   = ck => bases.reduce((a, b) => a + cellQ(b.key, ck), 0);
   const grandTotal = ()  => bases.reduce((a, b) => a + rowTotal(b.key), 0);
 
-  // Conta celulas com estoque <= 2 (ruptura ou critico)
+  // Conta células com estoque consolidado <= 2 (ruptura ou crítico) independente de fornecedor
   let ruptureCount = 0;
-  bases.forEach(b => columns.forEach(c => { if (cellQ(b.key, c.key) <= 2) ruptureCount++; }));
+  bases.forEach(b => visibleColumns.forEach(c => { 
+    if (cellQ(b.key, c.key) <= 2) ruptureCount++; 
+  }));
 
-  const getCellClass = (qty, items = []) => {
+  // Ruptura avaliada pelo total consolidado de lentes da célula independente de fornecedor
+  const getCellClass = (qty) => {
     if (qty === 0) return 'lens-cell empty';
-    if (items && items.length > 0) {
-      const hasRupture = items.some(i => (i.quantity_available || 0) === 0);
-      const hasCritical = items.some(i => (i.quantity_available || 0) >= 1 && (i.quantity_available || 0) <= 2);
-      const hasLow = items.some(i => (i.quantity_available || 0) >= 3 && (i.quantity_available || 0) <= 4);
-      if (hasRupture) return 'lens-cell rupture';
-      if (hasCritical) return 'lens-cell critical';
-      if (hasLow) return 'lens-cell low';
-    }
     if (qty >= 1 && qty <= 2) return 'lens-cell critical';
     if (qty >= 3 && qty <= 4) return 'lens-cell low';
     return 'lens-cell normal';
@@ -308,7 +345,13 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
 
   const visibleColumns = (() => {
     let cols = showFullRange ? columns : columns.filter(c => !c.key.includes("167"));
-    if (filterColKey) cols = cols.filter(c => c.key === filterColKey);
+    if (filterTreatment) {
+      const targetLower = filterTreatment.trim().toLowerCase();
+      const matched = cols.filter(c => c.treatments && c.treatments.some(t => t === targetLower || targetLower.includes(t) || t.includes(targetLower)));
+      if (matched.length > 0) return matched;
+      const customMatch = cols.filter(c => c.label.toLowerCase() === targetLower || c.key.toLowerCase().includes(targetLower));
+      if (customMatch.length > 0) return customMatch;
+    }
     return cols;
   })();
   const visibleBases = searchBase
@@ -358,7 +401,7 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
           style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", padding: "12px 16px", borderRadius: "10px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "#dc2626", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <ShieldAlert size={20} color="#dc2626" />
-            <span>Atenção: Existem <strong>{ruptureCount} dioptrias</strong> de Blocos Visão Simples em nível Crítico/Ruptura.</span>
+            <span>Atenção: Existem <strong>{ruptureCount} dioptrias</strong> de Blocos Visão Simples em nível Crítico/Ruptura (consolidado independente de fornecedor).</span>
           </div>
           <button style={{ padding: "6px 12px", background: "#dc2626", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: 700, fontSize: "0.78rem" }}>
             Ver Alertas ➔
@@ -368,17 +411,18 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
 
       {/* ── FILTROS (identico a Grade 1.67 e Grade Optica) ── */}
       <div style={{ marginBottom: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="form-group" style={{ flex: 1, minWidth: '280px' }}>
+        <div className="form-group" style={{ flex: 1, minWidth: '240px' }}>
           <label className="form-label">Filtrar por Tratamento</label>
           <select
             className="form-control"
-            value={filterColKey}
-            onChange={e => setFilterColKey(e.target.value)}
+            value={filterTreatment}
+            onChange={e => setFilterTreatment(e.target.value)}
+            style={{ color: 'black' }}
           >
-            <option value="">Todos os Tratamentos (Visão Consolidada)</option>
-            {columns.map(col => (
-              <option key={col.key} value={col.key}>
-                {col.label} {col.isCustom ? '(Personalizado)' : ''}
+            <option value="">Todos os Tratamentos ({uniqueTreatments.length})</option>
+            {uniqueTreatments.map((treat, idx) => (
+              <option key={idx} value={treat}>
+                {treat}
               </option>
             ))}
           </select>
@@ -451,7 +495,7 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
                       const qty   = cellQ(row.key, col.key);
                       const items = cellI(row.key, col.key);
                       return (
-                        <td key={col.key} className={getCellClass(qty, items)}
+                        <td key={col.key} className={getCellClass(qty)}
                           onClick={() => handleOpenCellModal(row, col)}>
                           <div className="lens-cell-inner">
                             <span className="lens-qty">{qty}</span>
@@ -580,20 +624,20 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
               </button>
             </div>
             <div style={{ marginTop: "16px", maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
-              {BASES.flatMap(b =>
-                LENS_COLUMNS.filter(col => cellQ(b.key, col.key) <= 2).map(col => {
+              {bases.flatMap(b =>
+                visibleColumns.filter(col => cellQ(b.key, col.key) <= 2).map(col => {
                   const qty = cellQ(b.key, col.key);
                   return (
                     <div key={b.key + "-" + col.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: qty === 0 ? "rgba(239,68,68,0.06)" : "rgba(249,115,22,0.06)", border: "1px solid " + (qty === 0 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)"), padding: "12px 16px", borderRadius: "8px" }}>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "white" }}>{b.fullLabel} x {col.label}</div>
-                        <div style={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", marginTop: "2px" }}>{b.description}</div>
+                        <div style={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", marginTop: "2px" }}>Estoque Consolidado Independente de Fornecedor</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <span style={{ fontSize: "1.1rem", fontWeight: 900, color: qty === 0 ? "#f87171" : "#f97316" }}>{qty} un</span>
                         <div>
                           <span style={{ background: qty === 0 ? "#dc2626" : "#f97316", color: "#fff", borderRadius: "6px", padding: "2px 8px", fontSize: "0.75rem", fontWeight: 800 }}>
-                            {qty === 0 ? "RUPTURA" : "CRITICO"}
+                            {qty === 0 ? "RUPTURA" : "CRÍTICO"}
                           </span>
                         </div>
                       </div>

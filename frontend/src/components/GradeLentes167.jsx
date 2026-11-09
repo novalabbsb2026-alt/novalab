@@ -130,16 +130,6 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
     if (!item) return 'lens-cell empty';
     const qty = item.quantity_available !== undefined ? item.quantity_available : 0;
     if (qty === 0) return 'lens-cell rupture';
-
-    if (item.isConsolidated && item.items && item.items.length > 0) {
-      const hasRupture = item.items.some(i => (i.quantity_available || 0) === 0);
-      const hasCritical = item.items.some(i => (i.quantity_available || 0) >= 1 && (i.quantity_available || 0) <= 2);
-      const hasLow = item.items.some(i => (i.quantity_available || 0) >= 3 && (i.quantity_available || 0) <= 4);
-      if (hasRupture) return 'lens-cell rupture';
-      if (hasCritical) return 'lens-cell critical';
-      if (hasLow) return 'lens-cell low';
-    }
-
     if (qty >= 1 && qty <= 2) return 'lens-cell critical';
     if (qty >= 3 && qty <= 4) return 'lens-cell low';
     return 'lens-cell normal';
@@ -233,10 +223,46 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
   });
   const uniqueTreatments = Array.from(uniqueTreatmentsMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
+  // Dioptrias consolidadas independente de fornecedor
+  const consolidatedDiopters = React.useMemo(() => {
+    const map = new Map();
+    gridData.forEach(item => {
+      const mType = item.lens_model?.matrix_type;
+      if (mType && mType !== 'GRADE_167') return;
+      if (selectedModelId && String(item.lens_model_id) !== String(selectedModelId)) return;
+      const sph = parseFloat(item.spherical).toFixed(2);
+      const cyl = parseFloat(item.cylindrical).toFixed(2);
+      const key = `${sph}_${cyl}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: `diopter_167_${key}`,
+          spherical: sph,
+          cylindrical: cyl,
+          quantity_available: 0,
+          items: [],
+          models: new Set(),
+          location_tag: item.location_tag || ''
+        });
+      }
+      const entry = map.get(key);
+      entry.quantity_available += (item.quantity_available || 0);
+      entry.items.push(item);
+      const brand = item.lens_model?.brand || item.lens_model?.name;
+      if (brand) entry.models.add(brand);
+      if (item.location_tag && !entry.location_tag) entry.location_tag = item.location_tag;
+    });
+    return Array.from(map.values()).map(d => ({
+      ...d,
+      brand: Array.from(d.models).join(', ') || 'Todas as Marcas (1.67)',
+      barcode: d.items.map(i => i.barcode).filter(Boolean).slice(0, 2).join(' / ') || 'Consolidado'
+    }));
+  }, [gridData, selectedModelId]);
+
+  const criticalDiopters = consolidatedDiopters.filter(d => d.quantity_available <= 2);
+
   const handleExportPDF = (itemsList = null) => {
-    const criticalItems = gridData.filter(i => (i.quantity_available || 0) <= 2);
-    const itemsToExport = itemsList || criticalItems;
-    const modelName = selectedModel ? `${selectedModel.brand} - ${selectedModel.name}` : 'Lentes 1.67 (Todas as Marcas)';
+    const itemsToExport = itemsList || criticalDiopters;
+    const modelName = selectedModel ? `${selectedModel.brand} - ${selectedModel.name}` : 'Lentes 1.67 (Todas as Marcas Consolidado)';
     const nowStr = new Date().toLocaleString('pt-BR');
 
     const printWindow = window.open('', '_blank', 'width=950,height=750');
@@ -347,14 +373,14 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
         </div>
       </div>
 
-      {gridData.some(i => (i.quantity_available !== undefined ? i.quantity_available : 0) <= 2) && (
+      {criticalDiopters.length > 0 && (
         <div 
           onClick={() => setShowRuptureAlertModal(true)}
           style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#dc2626', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShieldAlert size={20} color="#dc2626" />
-            <span>Atenção: Existem <strong>{gridData.filter(i => (i.quantity_available || 0) <= 2).length} dioptrias</strong> de Lentes 1.67 em nível Crítico/Ruptura.</span>
+            <span>Atenção: Existem <strong>{criticalDiopters.length} dioptrias</strong> de Lentes 1.67 em nível Crítico/Ruptura considerando o saldo consolidado de todas as marcas.</span>
           </div>
           <button style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>
             Ver Alertas ➔
@@ -669,16 +695,16 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {gridData.filter(i => (i.quantity_available || 0) <= 2).length === 0 ? (
+                    {criticalDiopters.length === 0 ? (
                       <tr>
                         <td colSpan="5" style={{ padding: '16px', textAlign: 'center', color: 'hsl(var(--text-muted))' }}>
                           Nenhuma dioptria crítica encontrada para o filtro atual.
                         </td>
                       </tr>
                     ) : (
-                      gridData.filter(i => (i.quantity_available || 0) <= 2).map((item, idx) => (
+                      criticalDiopters.map((item, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-glass)' }}>
-                          <td style={{ padding: '10px', fontWeight: 600 }}>{item.lens_model?.name || item.brand || 'Lente 1.67'}</td>
+                          <td style={{ padding: '10px', fontWeight: 600 }}>{item.brand}</td>
                           <td style={{ padding: '10px' }}>{parseFloat(item.spherical) > 0 ? '+' : ''}{parseFloat(item.spherical).toFixed(2)}</td>
                           <td style={{ padding: '10px' }}>{parseFloat(item.cylindrical).toFixed(2)}</td>
                           <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#ef4444' : '#f59e0b' }}>
@@ -695,7 +721,7 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
                 <button 
                   className="btn btn-outline"
-                  onClick={() => handleExportPDF(gridData.filter(i => (i.quantity_available || 0) <= 2))}
+                  onClick={() => handleExportPDF(criticalDiopters)}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <FileText size={16} /> Exportar PDF de Ruptura
