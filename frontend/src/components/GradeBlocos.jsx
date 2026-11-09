@@ -410,7 +410,7 @@ const GradeBlocos = () => {
             td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
             tr:nth-child(even) { background: #f8fafc; }
             .status-rupture { color: #dc2626; font-weight: 800; }
-            .status-alert { color: #d97706; font-weight: 800; }
+            .status-alert { color: #b45309; font-weight: 800; }
             .side-d { color: #0284c7; font-weight: 800; }
             .side-e { color: #9333ea; font-weight: 800; }
             .footer { margin-top: 25px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px; }
@@ -1090,12 +1090,12 @@ const GradeBlocos = () => {
                 </thead>
                 <tbody>
                   {criticalBlockItems.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: item.quantity_available === 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: item.quantity_available === 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(250, 204, 21, 0.15)' }}>
                       <td style={{ padding: '8px 12px', fontWeight: 600 }}>{item.block_model?.name || item.brand || 'Modelo de Bloco'}</td>
                       <td style={{ padding: '8px 12px' }}>{parseFloat(item.base_curve).toFixed(2)}</td>
                       <td style={{ padding: '8px 12px' }}>+{parseFloat(item.addition).toFixed(2)}</td>
                       <td style={{ padding: '8px 12px', fontWeight: 700, color: item.eye_side === 'D' ? '#00f2fe' : '#c084fc' }}>{item.eye_side || 'AMBOS'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#dc2626' : '#d97706' }}>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#dc2626' : '#b45309' }}>
                         {item.quantity_available} un
                       </td>
                       <td style={{ padding: '8px 12px', fontSize: '0.75rem', opacity: 0.85 }}>{item.location_tag || 'GAVETA-S/N'}</td>

@@ -311,7 +311,7 @@ const GradeMultifocalAcabado = () => {
             td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
             tr:nth-child(even) { background: #f8fafc; }
             .status-rupture { color: #dc2626; font-weight: 800; }
-            .status-alert { color: #d97706; font-weight: 800; }
+            .status-alert { color: #b45309; font-weight: 800; }
             .side-d { color: #0284c7; font-weight: 800; }
             .side-e { color: #9333ea; font-weight: 800; }
             .footer { margin-top: 25px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px; }
@@ -863,7 +863,7 @@ const GradeMultifocalAcabado = () => {
                           <td style={{ padding: '10px' }}>Base {parseFloat(item.base_curve || item.spherical || 0).toFixed(2)}</td>
                           <td style={{ padding: '10px' }}>+{parseFloat(item.addition || item.cylindrical || 0).toFixed(2)}</td>
                           <td style={{ padding: '10px', fontWeight: 700, color: (item.eye || item.eye_side) === 'OE' ? '#38bdf8' : '#a855f7' }}>{item.eye || item.eye_side || 'OD'}</td>
-                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#ef4444' : '#f59e0b' }}>
+                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#dc2626' : '#b45309' }}>
                             {item.quantity_available || 0} un
                           </td>
                           <td style={{ padding: '10px' }}>{item.location_tag || 'GAVETA-S/N'}</td>

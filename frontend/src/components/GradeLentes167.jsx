@@ -288,7 +288,7 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
             td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
             tr:nth-child(even) { background: #f8fafc; }
             .status-rupture { color: #dc2626; font-weight: 800; }
-            .status-alert { color: #d97706; font-weight: 800; }
+            .status-alert { color: #b45309; font-weight: 800; }
             .footer { margin-top: 25px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px; }
             @media print { body { padding: 0; } }
           </style>
@@ -707,7 +707,7 @@ const GradeLentes167 = ({ onOpenManualInsert }) => {
                           <td style={{ padding: '10px', fontWeight: 600 }}>{item.brand}</td>
                           <td style={{ padding: '10px' }}>{parseFloat(item.spherical) > 0 ? '+' : ''}{parseFloat(item.spherical).toFixed(2)}</td>
                           <td style={{ padding: '10px' }}>{parseFloat(item.cylindrical).toFixed(2)}</td>
-                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#ef4444' : '#f59e0b' }}>
+                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: item.quantity_available === 0 ? '#dc2626' : '#b45309' }}>
                             {item.quantity_available || 0} un
                           </td>
                           <td style={{ padding: '10px' }}>{item.location_tag || 'GAVETA-S/N'}</td>

@@ -486,45 +486,76 @@ p {
   max-width: 75px;
 }
 
-/* Status das células na grade */
+/* Status das células na grade com alto contraste (Semáforo Industrial) */
 .lens-cell.empty {
   color: hsl(var(--text-muted));
-  opacity: 0.4;
+  opacity: 0.35;
+  background: transparent;
 }
 
-.lens-cell.rupture {
-  background: hsl(var(--danger) / 0.12);
-  border: 1px solid hsl(var(--danger) / 0.3);
-  color: hsl(var(--danger));
-}
-.lens-cell.rupture:hover {
-  background: hsl(var(--danger) / 0.2);
-}
-
+/* 1 e 2 unidades: Ruptura / Estoque Crítico - Vermelho Vivo com Borda Definida */
+.lens-cell.rupture,
 .lens-cell.critical {
-  background: hsl(var(--danger) / 0.18);
-  border: 1px solid hsl(var(--danger) / 0.4);
-  color: hsl(var(--danger));
+  background: rgba(254, 226, 226, 0.72) !important;
+  border: 1.5px solid #ef4444 !important;
+  color: #dc2626 !important;
 }
+.lens-cell.rupture:hover,
 .lens-cell.critical:hover {
-  background: hsl(var(--danger) / 0.28);
+  background: rgba(254, 202, 202, 0.90) !important;
+  border-color: #b91c1c !important;
+}
+.lens-cell.rupture .lens-qty,
+.lens-cell.critical .lens-qty {
+  color: #b91c1c !important;
+  font-weight: 800;
+}
+.lens-cell.rupture .lens-loc,
+.lens-cell.critical .lens-loc {
+  color: #dc2626 !important;
+  font-weight: 700;
 }
 
-.lens-cell.low, .lens-cell.alert {
-  background: hsl(var(--warning) / 0.12);
-  border: 1px solid hsl(var(--warning) / 0.3);
-  color: hsl(var(--warning));
+/* 3 e 4 unidades: Estoque Baixo / Alerta - Amarelo Solar / Ouro Vibrante */
+.lens-cell.low,
+.lens-cell.alert {
+  background: rgba(254, 240, 138, 0.70) !important;
+  border: 1.5px solid #eab308 !important;
+  color: #854d0e !important;
 }
-.lens-cell.low:hover, .lens-cell.alert:hover {
-  background: hsl(var(--warning) / 0.2);
+.lens-cell.low:hover,
+.lens-cell.alert:hover {
+  background: rgba(253, 224, 71, 0.90) !important;
+  border-color: #ca8a04 !important;
+}
+.lens-cell.low .lens-qty,
+.lens-cell.alert .lens-qty {
+  color: #78350f !important;
+  font-weight: 800;
+}
+.lens-cell.low .lens-loc,
+.lens-cell.alert .lens-loc {
+  color: #a16207 !important;
+  font-weight: 700;
 }
 
+/* 5+ unidades: Estoque Normal - Verde Vivo */
 .lens-cell.normal {
-  background: hsl(var(--success) / 0.08);
-  color: hsl(var(--success));
+  background: rgba(220, 252, 231, 0.65) !important;
+  border: 1.5px solid #22c55e !important;
+  color: #15803d !important;
 }
 .lens-cell.normal:hover {
-  background: hsl(var(--success) / 0.15);
+  background: rgba(187, 247, 208, 0.85) !important;
+  border-color: #16a34a !important;
+}
+.lens-cell.normal .lens-qty {
+  color: #15803d !important;
+  font-weight: 800;
+}
+.lens-cell.normal .lens-loc {
+  color: #16a34a !important;
+  font-weight: 700;
 }
 
 /* Scanner de Câmera */
@@ -665,16 +696,18 @@ h1, h2, h3, h4, h5, h6, p, label, strong, span, li, td, th, input, select, texta
 }
 
 /* Mantém as cores de feedback/status com contraste legível */
-.lens-cell.rupture, .lens-cell.rupture *,
+.lens-cell.rupture, .lens-cell.rupture * {
+  color: #dc2626 !important;
+}
 .lens-cell.critical, .lens-cell.critical * {
-  color: hsl(var(--danger)) !important;
+  color: #dc2626 !important;
 }
 .lens-cell.alert, .lens-cell.alert *,
 .lens-cell.low, .lens-cell.low * {
-  color: hsl(var(--warning)) !important;
+  color: #854d0e !important;
 }
 .lens-cell.normal, .lens-cell.normal * {
-  color: hsl(var(--success)) !important;
+  color: #15803d !important;
 }
 .alert-card.rupture, .alert-card.rupture * {
   color: hsl(var(--danger)) !important;

@@ -395,7 +395,7 @@ const GradeOptica = ({ onOpenManualInsert }) => {
             td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
             tr:nth-child(even) { background: #f8fafc; }
             .status-rupture { color: #dc2626; font-weight: 800; }
-            .status-alert { color: #d97706; font-weight: 800; }
+            .status-alert { color: #b45309; font-weight: 800; }
             .footer { margin-top: 25px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px; }
             @media print {
               body { padding: 0; }
@@ -1010,11 +1010,11 @@ const GradeOptica = ({ onOpenManualInsert }) => {
                       </td>
                       <td style={{ padding: '10px', fontWeight: 700 }}>{parseFloat(item.cylindrical).toFixed(2)}</td>
                       <td style={{ padding: '10px', color: '#64748b' }}>{item.location_tag || 'Gaveta Matriz'}</td>
-                      <td style={{ padding: '10px', fontWeight: 700, color: item.quantity_available === 0 ? '#ef4444' : '#f97316' }}>
+                      <td style={{ padding: '10px', fontWeight: 700, color: item.quantity_available === 0 ? '#dc2626' : '#b45309' }}>
                         {item.quantity_available} un
                       </td>
                       <td style={{ padding: '10px' }}>
-                        <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, background: item.quantity_available === 0 ? 'rgba(239,68,68,0.1)' : 'rgba(249,115,22,0.1)', color: item.quantity_available === 0 ? '#ef4444' : '#f97316' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, background: item.quantity_available === 0 ? 'rgba(239,68,68,0.15)' : 'rgba(250,204,21,0.20)', color: item.quantity_available === 0 ? '#dc2626' : '#854d0e' }}>
                           {item.quantity_available === 0 ? 'RUPTURA' : 'CRÍTICO'}
                         </span>
                       </td>

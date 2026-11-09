@@ -628,15 +628,15 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
                 visibleColumns.filter(col => cellQ(b.key, col.key) <= 2).map(col => {
                   const qty = cellQ(b.key, col.key);
                   return (
-                    <div key={b.key + "-" + col.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: qty === 0 ? "rgba(239,68,68,0.06)" : "rgba(249,115,22,0.06)", border: "1px solid " + (qty === 0 ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.25)"), padding: "12px 16px", borderRadius: "8px" }}>
+                    <div key={b.key + "-" + col.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: qty === 0 ? "rgba(239,68,68,0.10)" : "rgba(250,204,21,0.18)", border: "1.5px solid " + (qty === 0 ? "#ef4444" : "#eab308"), padding: "12px 16px", borderRadius: "8px" }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "white" }}>{b.fullLabel} x {col.label}</div>
+                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "hsl(var(--text-primary))" }}>{b.fullLabel} x {col.label}</div>
                         <div style={{ fontSize: "0.75rem", color: "hsl(var(--text-muted))", marginTop: "2px" }}>Estoque Consolidado Independente de Fornecedor</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: "1.1rem", fontWeight: 900, color: qty === 0 ? "#f87171" : "#f97316" }}>{qty} un</span>
+                        <span style={{ fontSize: "1.1rem", fontWeight: 900, color: qty === 0 ? "#dc2626" : "#854d0e" }}>{qty} un</span>
                         <div>
-                          <span style={{ background: qty === 0 ? "#dc2626" : "#f97316", color: "#fff", borderRadius: "6px", padding: "2px 8px", fontSize: "0.75rem", fontWeight: 800 }}>
+                          <span style={{ background: qty === 0 ? "#dc2626" : "#eab308", color: qty === 0 ? "#fff" : "#78350f", borderRadius: "6px", padding: "2px 8px", fontSize: "0.75rem", fontWeight: 800 }}>
                             {qty === 0 ? "RUPTURA" : "CRÍTICO"}
                           </span>
                         </div>
