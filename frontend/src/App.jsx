@@ -386,7 +386,7 @@ function App() {
           </div>
         </div>
 
-        <nav className="nav-tabs nav-desktop-tabs" style={{ gap: '15px', background: 'transparent', border: 'none', boxShadow: 'none', overflow: 'visible' }}>
+        <nav className="nav-tabs nav-desktop-tabs" style={{ gap: '8px', background: 'transparent', border: 'none', boxShadow: 'none', overflow: 'visible' }}>
 
           {/* DESTAQUE PRINCIPAL: Painel de Laboratórios (Exclusivo SuperAdmin) */}
           {currentUser?.is_superadmin && (
@@ -394,22 +394,10 @@ function App() {
               <button 
                 type="button"
                 className={`dropdown-trigger ${activeTab === 'painel-laboratorios' ? 'active' : ''}`}
-                style={{
-                  background: activeTab === 'painel-laboratorios' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'rgba(99, 102, 241, 0.15)',
-                  border: '1px solid #818cf8',
-                  color: '#ffffff',
-                  fontWeight: 800,
-                  boxShadow: activeTab === 'painel-laboratorios' ? '0 4px 12px rgba(79, 70, 229, 0.4)' : 'none',
-                  padding: '7px 14px',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
                 onClick={() => { setActiveTab('painel-laboratorios'); setOpenDropdown(null); }}
                 title="Administração global de laboratórios cadastrados"
               >
-                <Building2 size={18} style={{ color: '#ffffff' }} /> Painel de Laboratórios
+                <Building2 size={16} /> Laboratórios
               </button>
             </div>
           )}
@@ -671,54 +659,51 @@ function App() {
         </nav>
 
         {/* Informações do usuário logado & Seletor de Laboratório Multi-Tenant (Desktop) */}
-        <div className="user-desktop-info" style={{ display: 'flex', alignItems: 'center', gap: '14px', paddingRight: '20px' }}>
+        <div className="user-desktop-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
           {/* Badge / Seletor do Tenant Ativo */}
-          <div
+          <button
+            type="button"
             onClick={() => currentUser.is_superadmin && setShowTenantModal(true)}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              backgroundColor: currentUser.is_superadmin ? '#f5f3ff' : 'hsl(var(--bg-card))',
-              border: currentUser.is_superadmin ? '1px solid #c7d2fe' : '1px solid hsl(var(--border))',
+              gap: '6px',
+              padding: '5px 10px',
+              borderRadius: '6px',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
               cursor: currentUser.is_superadmin ? 'pointer' : 'default',
-              transition: 'all 0.15s ease'
+              color: '#334155',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
-            title={currentUser.is_superadmin ? "Gerenciar e alternar laboratórios (SuperAdmin)" : "Laboratório Ativo"}
+            title={currentUser.is_superadmin ? "Clique para alternar o laboratório ativo" : "Laboratório Ativo"}
           >
-            <Building2 size={16} style={{ color: currentUser.is_superadmin ? '#6366f1' : 'hsl(var(--primary))' }} />
-            <div style={{ textAlign: 'left', lineHeight: 1.15 }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: currentUser.is_superadmin ? '#4338ca' : 'hsl(var(--text-primary))', display: 'block' }}>
-                {currentUser.tenant_name || 'Nova LAB Matriz'}
-              </span>
-              {currentUser.is_superadmin ? (
-                <span style={{ fontSize: '0.62rem', color: '#6366f1', fontWeight: 700 }}>
-                  Alternar Laboratório ▾
-                </span>
-              ) : (
-                <span style={{ fontSize: '0.62rem', color: 'hsl(var(--text-muted))', fontWeight: 600 }}>
-                  {currentUser.tenant_slug || 'matriz'}
-                </span>
-              )}
-            </div>
-          </div>
+            <Building2 size={14} style={{ color: currentUser.is_superadmin ? '#4f46e5' : 'hsl(var(--primary))' }} />
+            <span>{currentUser.tenant_name || 'Nova LAB Matriz'}</span>
+            {currentUser.is_superadmin && (
+              <span style={{ fontSize: '0.65rem', color: '#6366f1', marginLeft: '2px' }}>▾</span>
+            )}
+          </button>
 
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'hsl(var(--text-primary))', display: 'block' }}>{currentUser.name}</span>
-            <span style={{ fontSize: '0.7rem', color: 'hsl(var(--secondary))', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>{currentUser.role}</span>
+          <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'hsl(var(--text-primary))', display: 'block' }}>{currentUser.name}</span>
+            <span style={{ fontSize: '0.68rem', color: 'hsl(var(--secondary))', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>{currentUser.role}</span>
           </div>
           <button 
             onClick={handleLogout} 
             className="btn btn-outline" 
             style={{ 
-              padding: '6px 12px', 
-              fontSize: '0.85rem', 
+              padding: '5px 10px', 
+              fontSize: '0.8rem', 
               color: 'hsl(var(--danger))', 
               border: '1px solid rgba(239, 68, 68, 0.25)',
               background: 'transparent',
-              fontWeight: 700
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
           >
             Sair
