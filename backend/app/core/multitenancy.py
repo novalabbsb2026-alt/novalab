@@ -116,6 +116,29 @@ async def run_multitenant_migrations(conn):
     except Exception as e:
         logger.warning(f"[MULTI-TENANT] Erro inserindo tenant default: {e}")
 
+    # 2.1 Garante que os Perfis de Acesso padrão (Roles) existam
+    admin_role_id = uuid.uuid4()
+    operador_role_id = uuid.uuid4()
+    if is_postgres:
+        seed_roles_sql = f"""
+        INSERT INTO roles (id, name, description)
+        VALUES 
+            ('{admin_role_id}', 'Administrador', 'Perfil com acesso irrestrito ao sistema.'),
+            ('{operador_role_id}', 'Operador', 'Perfil com acesso a operação e movimentação de estoque.')
+        ON CONFLICT (name) DO NOTHING;
+        """
+    else:
+        seed_roles_sql = f"""
+        INSERT OR IGNORE INTO roles (id, name, description)
+        VALUES 
+            ('{admin_role_id}', 'Administrador', 'Perfil com acesso irrestrito ao sistema.'),
+            ('{operador_role_id}', 'Operador', 'Perfil com acesso a operação e movimentação de estoque.');
+        """
+    try:
+        await conn.execute(text(seed_roles_sql))
+    except Exception as e:
+        logger.warning(f"[MULTI-TENANT] Erro inserindo roles padrão: {e}")
+
     # 3. Adiciona colunas na tabela users
     if is_postgres:
         for u_col in [

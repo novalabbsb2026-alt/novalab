@@ -41,7 +41,8 @@ class Role(Base):
     permissions: Mapped[List[Permission]] = relationship(
         Permission,
         secondary=role_permissions,
-        back_populates="roles"
+        back_populates="roles",
+        lazy="selectin"
     )
 
 class User(Base):
@@ -63,5 +64,5 @@ class User(Base):
     )
     
     # Relacionamentos
-    role: Mapped[Optional[Role]] = relationship("Role", back_populates="users")
+    role: Mapped[Optional[Role]] = relationship("Role", back_populates="users", lazy="selectin")
     tenant: Mapped[Optional["Tenant"]] = relationship("Tenant", back_populates="users")

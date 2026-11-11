@@ -30,9 +30,21 @@ async def list_available_roles(
     """
     Retorna a lista de perfis de acesso (Roles) cadastrados na plataforma.
     """
-    stmt = select(Role).order_by(Role.name.asc())
+    stmt = select(Role).options(selectinload(Role.permissions)).order_by(Role.name.asc())
     result = await db.execute(stmt)
-    return result.scalars().all()
+    roles = result.scalars().all()
+
+    if not roles:
+        # Se as roles ainda não foram criadas no banco, cria sob demanda
+        admin_r = Role(name="Administrador", description="Perfil com acesso irrestrito ao sistema.")
+        op_r = Role(name="Operador", description="Perfil com acesso a operação e movimentação de estoque.")
+        db.add_all([admin_r, op_r])
+        await db.commit()
+        stmt2 = select(Role).options(selectinload(Role.permissions)).order_by(Role.name.asc())
+        res2 = await db.execute(stmt2)
+        roles = res2.scalars().all()
+
+    return roles
 
 # --- 2. Listagem de Laboratórios ---
 @router.get("/", response_model=List[TenantResponse])
@@ -242,7 +254,7 @@ async def list_tenant_users(
     stmt = (
         select(User)
         .where(User.tenant_id == tenant_id)
-        .options(selectinload(User.role))
+        .options(selectinload(User.role).selectinload(Role.permissions))
         .order_by(User.name.asc())
         .execution_options(include_all_tenants=True)
     )
@@ -299,7 +311,7 @@ async def create_tenant_user(
     query = (
         select(User)
         .where(User.id == new_user.id)
-        .options(selectinload(User.role))
+        .options(selectinload(User.role).selectinload(Role.permissions))
         .execution_options(include_all_tenants=True)
     )
     refreshed = await db.execute(query)
@@ -320,7 +332,7 @@ async def update_tenant_user(
     stmt = (
         select(User)
         .where(User.id == user_id, User.tenant_id == tenant_id)
-        .options(selectinload(User.role))
+        .options(selectinload(User.role).selectinload(Role.permissions))
         .execution_options(include_all_tenants=True)
     )
     res = await db.execute(stmt)
@@ -364,7 +376,7 @@ async def update_tenant_user(
     query = (
         select(User)
         .where(User.id == user.id)
-        .options(selectinload(User.role))
+        .options(selectinload(User.role).selectinload(Role.permissions))
         .execution_options(include_all_tenants=True)
     )
     refreshed = await db.execute(query)

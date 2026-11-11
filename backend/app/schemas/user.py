@@ -19,7 +19,7 @@ class RoleBase(BaseModel):
 
 class RoleResponse(RoleBase):
     id: uuid.UUID
-    permissions: List[PermissionResponse] = []
+    permissions: Optional[List[PermissionResponse]] = []
     
     model_config = ConfigDict(from_attributes=True)
 

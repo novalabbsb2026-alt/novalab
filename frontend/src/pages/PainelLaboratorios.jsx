@@ -100,7 +100,9 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
       const res = await axios.get(`${getBaseUrl()}/tenants/roles`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setRoles(res.data || []);
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setRoles(res.data);
+      }
     } catch (err) {
       console.error('Erro ao carregar roles:', err);
     }
@@ -192,11 +194,15 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
     setEditingUser(null);
     setUsersError('');
     setUsersSuccess('');
+    if (roles.length === 0) {
+      loadRoles();
+    }
     await loadTenantUsers(tenant.id);
   };
 
   const loadTenantUsers = async (tenantId) => {
     setLoadingUsers(true);
+    setUsersError('');
     try {
       const token = localStorage.getItem('factory_token');
       const res = await axios.get(`${getBaseUrl()}/tenants/${tenantId}/users`, {
@@ -205,13 +211,20 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
       setTenantUsersList(res.data || []);
     } catch (err) {
       console.error(err);
-      setUsersError(err.response?.data?.detail || 'Erro ao carregar usuários deste laboratório.');
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'string'
+        ? detail
+        : (Array.isArray(detail) ? detail.map(d => d.msg || JSON.stringify(d)).join(', ') : 'Erro ao carregar usuários deste laboratório.');
+      setUsersError(msg);
     } finally {
       setLoadingUsers(false);
     }
   };
 
   const handleOpenCreateUser = () => {
+    if (roles.length === 0) {
+      loadRoles();
+    }
     // Define role default como Operador ou a primeira role
     const defaultRole = roles.find(r => r.name === 'Operador') || roles[0];
     setEditingUser(null);
@@ -975,10 +988,22 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                        Perfil de Acesso / Função (Role) *
-                      </label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>
+                          Perfil de Acesso / Função (Role) *
+                        </label>
+                        {roles.length === 0 && (
+                          <button
+                            type="button"
+                            onClick={loadRoles}
+                            style={{ fontSize: '0.72rem', color: '#4f46e5', border: 'none', background: 'transparent', cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            Recarregar opções
+                          </button>
+                        )}
+                      </div>
                       <select
+                        required
                         value={userFormData.role_id}
                         onChange={(e) => setUserFormData({ ...userFormData, role_id: e.target.value })}
                         style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
