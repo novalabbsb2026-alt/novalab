@@ -9,28 +9,53 @@ import {
   CheckCircle2,
   XCircle,
   Edit2,
+  Trash2,
   ArrowRight,
   Shield,
   Phone,
   MapPin,
   X,
   Crown,
-  Layers
+  Users,
+  UserCheck,
+  UserX,
+  Key
 } from 'lucide-react';
 
 export default function PainelLaboratorios({ currentActiveTenantId, onTenantChange }) {
   const [tenants, setTenants] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Modais
+  // Modais de Laboratório
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
 
-  // Form states
+  // Modal de Gestão de Usuários do Laboratório
+  const [selectedTenantUsers, setSelectedTenantUsers] = useState(null); // tenant selecionado
+  const [tenantUsersList, setTenantUsersList] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [usersSuccess, setUsersSuccess] = useState('');
+
+  // Formulário de Criação/Edição de Usuário
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userFormData, setUserFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role_id: '',
+    is_active: true,
+    must_change_password: false
+  });
+  const [savingUser, setSavingUser] = useState(false);
+
+  // Form states de criação de laboratório
   const [createForm, setCreateForm] = useState({
     name: '',
     slug: '',
@@ -49,6 +74,7 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
 
   useEffect(() => {
     loadTenants();
+    loadRoles();
   }, []);
 
   const loadTenants = async () => {
@@ -65,6 +91,18 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
       setError(err.response?.data?.detail || 'Erro ao carregar a lista de laboratórios.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRoles = async () => {
+    try {
+      const token = localStorage.getItem('factory_token');
+      const res = await axios.get(`${getBaseUrl()}/tenants/roles`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRoles(res.data || []);
+    } catch (err) {
+      console.error('Erro ao carregar roles:', err);
     }
   };
 
@@ -147,6 +185,140 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
     window.location.reload();
   };
 
+  // --- Funções de Usuários do Laboratório ---
+  const handleOpenUsersModal = async (tenant) => {
+    setSelectedTenantUsers(tenant);
+    setShowUserForm(false);
+    setEditingUser(null);
+    setUsersError('');
+    setUsersSuccess('');
+    await loadTenantUsers(tenant.id);
+  };
+
+  const loadTenantUsers = async (tenantId) => {
+    setLoadingUsers(true);
+    try {
+      const token = localStorage.getItem('factory_token');
+      const res = await axios.get(`${getBaseUrl()}/tenants/${tenantId}/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTenantUsersList(res.data || []);
+    } catch (err) {
+      console.error(err);
+      setUsersError(err.response?.data?.detail || 'Erro ao carregar usuários deste laboratório.');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleOpenCreateUser = () => {
+    // Define role default como Operador ou a primeira role
+    const defaultRole = roles.find(r => r.name === 'Operador') || roles[0];
+    setEditingUser(null);
+    setUserFormData({
+      name: '',
+      email: '',
+      password: '',
+      role_id: defaultRole ? defaultRole.id : '',
+      is_active: true,
+      must_change_password: false
+    });
+    setUsersError('');
+    setShowUserForm(true);
+  };
+
+  const handleOpenEditUser = (user) => {
+    setEditingUser(user);
+    setUserFormData({
+      name: user.name || '',
+      email: user.email || '',
+      password: '', // em branco caso não queira redefinir
+      role_id: user.role_id || (user.role ? user.role.id : ''),
+      is_active: user.is_active,
+      must_change_password: user.must_change_password || false
+    });
+    setUsersError('');
+    setShowUserForm(true);
+  };
+
+  const handleSaveUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedTenantUsers) return;
+    if (!userFormData.name || !userFormData.email) {
+      setUsersError('Nome e Login/E-mail são obrigatórios.');
+      return;
+    }
+    if (!editingUser && !userFormData.password) {
+      setUsersError('A senha é obrigatória para cadastrar um novo usuário.');
+      return;
+    }
+
+    setSavingUser(true);
+    setUsersError('');
+    setUsersSuccess('');
+
+    try {
+      const token = localStorage.getItem('factory_token');
+      if (editingUser) {
+        // Atualização
+        const updatePayload = {
+          name: userFormData.name,
+          email: userFormData.email,
+          role_id: userFormData.role_id || null,
+          is_active: userFormData.is_active,
+          must_change_password: userFormData.must_change_password
+        };
+        if (userFormData.password && userFormData.password.trim()) {
+          updatePayload.password = userFormData.password.trim();
+        }
+
+        await axios.put(
+          `${getBaseUrl()}/tenants/${selectedTenantUsers.id}/users/${editingUser.id}`,
+          updatePayload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setUsersSuccess(`Usuário "${userFormData.name}" atualizado com sucesso!`);
+      } else {
+        // Criação
+        await axios.post(
+          `${getBaseUrl()}/tenants/${selectedTenantUsers.id}/users`,
+          userFormData,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setUsersSuccess(`Novo usuário "${userFormData.name}" cadastrado com sucesso!`);
+      }
+
+      setShowUserForm(false);
+      setEditingUser(null);
+      await loadTenantUsers(selectedTenantUsers.id);
+    } catch (err) {
+      console.error(err);
+      setUsersError(err.response?.data?.detail || 'Erro ao salvar dados do usuário.');
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (user) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o usuário "${user.name}" (${user.email})?`)) {
+      return;
+    }
+    setUsersError('');
+    setUsersSuccess('');
+    try {
+      const token = localStorage.getItem('factory_token');
+      await axios.delete(
+        `${getBaseUrl()}/tenants/${selectedTenantUsers.id}/users/${user.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUsersSuccess(`Usuário "${user.name}" excluído com sucesso!`);
+      await loadTenantUsers(selectedTenantUsers.id);
+    } catch (err) {
+      console.error(err);
+      setUsersError(err.response?.data?.detail || 'Erro ao excluir usuário.');
+    }
+  };
+
   const filteredTenants = tenants.filter(t => {
     const matchesSearch =
       t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -197,7 +369,7 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-            Controle global de laboratórios cadastrados, criação de filiais e alternância de sessão.
+            Controle global de laboratórios, filiais, usuários e alternância de sessão.
           </p>
         </div>
 
@@ -246,7 +418,7 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
         </div>
       </div>
 
-      {/* Cards de Métricas (Compactos e em 1 linha) */}
+      {/* Cards de Métricas */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
@@ -370,45 +542,19 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
 
       {/* Alertas */}
       {error && (
-        <div style={{
-          padding: '10px 14px',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '6px',
-          color: '#b91c1c',
-          marginBottom: '16px',
-          fontSize: '0.85rem'
-        }}>
+        <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', marginBottom: '16px', fontSize: '0.85rem' }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{
-          padding: '10px 14px',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderRadius: '6px',
-          color: '#15803d',
-          marginBottom: '16px',
-          fontSize: '0.85rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
+        <div style={{ padding: '10px 14px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#15803d', marginBottom: '16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <CheckCircle2 size={16} /> {success}
         </div>
       )}
 
       {/* Filtros e Busca */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '14px',
-        gap: '12px',
-        flexWrap: 'wrap'
-      }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', width: '360px' }}>
           <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input
@@ -416,15 +562,7 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
             placeholder="Buscar por nome, slug ou CNPJ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '7px 10px 7px 32px',
-              borderRadius: '6px',
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              fontSize: '0.84rem',
-              boxSizing: 'border-box'
-            }}
+            style={{ width: '100%', padding: '7px 10px 7px 32px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.84rem', boxSizing: 'border-box' }}
           />
         </div>
 
@@ -589,25 +727,11 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
                       {/* Status */}
                       <td style={{ padding: '10px 16px' }}>
                         {t.is_active ? (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            color: '#15803d',
-                            fontSize: '0.75rem',
-                            fontWeight: 600
-                          }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803d', fontSize: '0.75rem', fontWeight: 600 }}>
                             <CheckCircle2 size={13} /> Ativo
                           </span>
                         ) : (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            color: '#b91c1c',
-                            fontSize: '0.75rem',
-                            fontWeight: 600
-                          }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b91c1c', fontSize: '0.75rem', fontWeight: 600 }}>
                             <XCircle size={13} /> Inativo
                           </span>
                         )}
@@ -615,7 +739,29 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
 
                       {/* Ações */}
                       <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                          {/* Botão de Usuários */}
+                          <button
+                            onClick={() => handleOpenUsersModal(t)}
+                            title="Gerenciar usuários e acessos deste laboratório"
+                            style={{
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#ffffff',
+                              color: '#334155',
+                              padding: '4px 8px',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600
+                            }}
+                          >
+                            <Users size={12} style={{ color: '#4f46e5' }} /> Usuários
+                          </button>
+
+                          {/* Botão de Editar */}
                           <button
                             onClick={() => setEditingTenant(t)}
                             title="Editar dados cadastrais"
@@ -636,16 +782,9 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
                             <Edit2 size={12} /> Editar
                           </button>
 
+                          {/* Botão de Entrar */}
                           {isCurrent ? (
-                            <span style={{
-                              padding: '4px 10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              color: '#4f46e5',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
+                            <span style={{ padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, color: '#4f46e5', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <CheckCircle2 size={13} /> Em Uso
                             </span>
                           ) : (
@@ -679,7 +818,344 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
         </div>
       </div>
 
-      {/* MODAL: CRIAR NOVO LABORATÓRIO */}
+      {/* ======================================================== */}
+      {/* MODAL: GESTÃO DE USUÁRIOS DO LABORATÓRIO SELECIONADO   */}
+      {/* ======================================================== */}
+      {selectedTenantUsers && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '10px',
+            width: '100%',
+            maxWidth: '850px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden'
+          }}>
+            {/* Header do Modal de Usuários */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={18} style={{ color: '#4f46e5' }} />
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                    Usuários: {selectedTenantUsers.name}
+                  </h3>
+                  <code style={{ fontSize: '0.72rem', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>
+                    {selectedTenantUsers.slug}
+                  </code>
+                </div>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Gerencie os operadores e administradores deste laboratório respeitando os perfis de acesso.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {!showUserForm && (
+                  <button
+                    onClick={handleOpenCreateUser}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#4f46e5',
+                      color: '#ffffff',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={14} /> Novo Usuário
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedTenantUsers(null)}
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Conteúdo do Modal de Usuários */}
+            <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+              {usersError && (
+                <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', marginBottom: '14px', fontSize: '0.82rem' }}>
+                  {usersError}
+                </div>
+              )}
+
+              {usersSuccess && (
+                <div style={{ padding: '10px 14px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#15803d', marginBottom: '14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle2 size={15} /> {usersSuccess}
+                </div>
+              )}
+
+              {showUserForm ? (
+                /* Formulário de Criação/Edição de Usuário */
+                <form onSubmit={handleSaveUserSubmit} style={{ backgroundColor: '#f8fafc', padding: '18px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+                      {editingUser ? `Editar Usuário: ${editingUser.name}` : 'Cadastrar Novo Usuário no Laboratório'}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowUserForm(false)}
+                      style={{ border: 'none', background: 'transparent', color: '#64748b', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Voltar à Lista
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Nome Completo *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: João da Silva"
+                        value={userFormData.name}
+                        onChange={(e) => setUserFormData({ ...userFormData, name: e.target.value })}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Login / E-mail de Acesso *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="joao.silva ou joao@lab.com"
+                        value={userFormData.email}
+                        onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        {editingUser ? 'Nova Senha (deixe em branco para manter)' : 'Senha de Acesso *'}
+                      </label>
+                      <input
+                        type="password"
+                        required={!editingUser}
+                        placeholder={editingUser ? 'Digite apenas para alterar' : 'Mínimo 4 caracteres'}
+                        value={userFormData.password}
+                        onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Perfil de Acesso / Função (Role) *
+                      </label>
+                      <select
+                        value={userFormData.role_id}
+                        onChange={(e) => setUserFormData({ ...userFormData, role_id: e.target.value })}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      >
+                        <option value="">-- Selecione o Perfil --</option>
+                        {roles.map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.name} {r.description ? `(${r.description})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#1e293b', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={userFormData.is_active}
+                        onChange={(e) => setUserFormData({ ...userFormData, is_active: e.target.checked })}
+                        style={{ width: '16px', height: '16px', accentColor: '#4f46e5' }}
+                      />
+                      Usuário Ativo (Pode fazer login no sistema)
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#1e293b', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={userFormData.must_change_password}
+                        onChange={(e) => setUserFormData({ ...userFormData, must_change_password: e.target.checked })}
+                        style={{ width: '16px', height: '16px', accentColor: '#4f46e5' }}
+                      />
+                      Exigir troca de senha no primeiro login
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowUserForm(false)}
+                      style={{ padding: '6px 12px', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingUser}
+                      style={{ padding: '6px 16px', borderRadius: '5px', border: 'none', backgroundColor: '#4f46e5', color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      {savingUser ? 'Salvando...' : (editingUser ? 'Atualizar Usuário' : 'Cadastrar Usuário')}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {/* Tabela de Usuários */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      <th style={{ padding: '8px 14px', fontWeight: 600, color: '#475569' }}>Nome</th>
+                      <th style={{ padding: '8px 14px', fontWeight: 600, color: '#475569' }}>Login / E-mail</th>
+                      <th style={{ padding: '8px 14px', fontWeight: 600, color: '#475569' }}>Perfil / Função</th>
+                      <th style={{ padding: '8px 14px', fontWeight: 600, color: '#475569' }}>Status</th>
+                      <th style={{ padding: '8px 14px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingUsers ? (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                          <RefreshCw size={16} className="animate-spin" style={{ margin: '0 auto 4px auto' }} />
+                          Carregando usuários...
+                        </td>
+                      </tr>
+                    ) : tenantUsersList.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                          Nenhum usuário cadastrado neste laboratório. Clique em <strong>+ Novo Usuário</strong> para criar o primeiro.
+                        </td>
+                      </tr>
+                    ) : (
+                      tenantUsersList.map(u => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 14px', fontWeight: 600, color: '#0f172a' }}>
+                            {u.name}
+                            {u.is_superadmin && (
+                              <span style={{ marginLeft: '6px', fontSize: '0.62rem', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '1px 5px', borderRadius: '3px' }}>
+                                SuperAdmin
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 14px', color: '#475569', fontFamily: 'monospace' }}>
+                            {u.email}
+                          </td>
+                          <td style={{ padding: '8px 14px' }}>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: u.role?.name === 'Administrador' ? '#fef3c7' : '#e0e7ff',
+                              color: u.role?.name === 'Administrador' ? '#b45309' : '#4338ca'
+                            }}>
+                              {u.role ? u.role.name : 'Sem Perfil'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 14px' }}>
+                            {u.is_active ? (
+                              <span style={{ color: '#15803d', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <CheckCircle2 size={12} /> Ativo
+                              </span>
+                            ) : (
+                              <span style={{ color: '#b91c1c', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <XCircle size={12} /> Inativo
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 14px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                              <button
+                                onClick={() => handleOpenEditUser(u)}
+                                title="Editar dados e perfil do usuário"
+                                style={{
+                                  border: '1px solid #cbd5e1',
+                                  backgroundColor: '#ffffff',
+                                  color: '#334155',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 500
+                                }}
+                              >
+                                <Edit2 size={11} /> Editar
+                              </button>
+
+                              {!u.is_superadmin && (
+                                <button
+                                  onClick={() => handleDeleteUser(u)}
+                                  title="Excluir usuário"
+                                  style={{
+                                    border: '1px solid #fecaca',
+                                    backgroundColor: '#fef2f2',
+                                    color: '#b91c1c',
+                                    padding: '3px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  <Trash2 size={11} /> Excluir
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: CRIAR NOVO LABORATÓRIO                            */}
+      {/* ======================================================== */}
       {showCreateModal && (
         <div style={{
           position: 'fixed',
@@ -916,7 +1392,9 @@ export default function PainelLaboratorios({ currentActiveTenantId, onTenantChan
         </div>
       )}
 
-      {/* MODAL: EDITAR DADOS DO LABORATÓRIO */}
+      {/* ======================================================== */}
+      {/* MODAL: EDITAR DADOS DO LABORATÓRIO                       */}
+      {/* ======================================================== */}
       {editingTenant && (
         <div style={{
           position: 'fixed',
