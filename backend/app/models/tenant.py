@@ -34,3 +34,4 @@ class Tenant(Base):
 
     # Relacionamento com usuários do tenant
     users: Mapped[List["User"]] = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+

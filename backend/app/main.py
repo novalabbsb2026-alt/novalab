@@ -43,6 +43,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_startup_migration_done = False
+_startup_migration_lock = asyncio.Lock()
+
+@app.middleware("http")
+async def ensure_multitenant_migrations_middleware(request, call_next):
+    global _startup_migration_done
+    if not _startup_migration_done and not request.url.path.startswith("/docs") and not request.url.path.startswith("/openapi.json"):
+        async with _startup_migration_lock:
+            if not _startup_migration_done:
+                try:
+                    async with engine.begin() as conn:
+                        await run_multitenant_migrations(conn)
+                except Exception as e:
+                    print(f"[BOOTSTRAP MIGRATION ERROR] {e}")
+                _startup_migration_done = True
+    response = await call_next(request)
+    return response
+
 from fastapi.responses import JSONResponse
 
 @app.exception_handler(Exception)

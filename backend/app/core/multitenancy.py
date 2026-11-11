@@ -2,7 +2,7 @@ import uuid
 import logging
 from typing import Optional
 from sqlalchemy import text
-from backend.app.core.database import current_tenant_ctx
+from backend.app.core.security import get_password_hash
 
 logger = logging.getLogger("multitenancy")
 
@@ -11,6 +11,10 @@ DEFAULT_TENANT_ID = uuid.UUID("23156c49-2618-4a5f-882f-137927eaec53")
 DEFAULT_TENANT_NAME = "Nova LAB Matriz"
 DEFAULT_TENANT_SLUG = "matriz"
 DEFAULT_TENANT_CNPJ = "58.032.958/0001-44"
+
+# Superusuário da plataforma
+SUPERADMIN_EMAIL = "rafa.busy@gmail.com"
+SUPERADMIN_PASSWORD_HASH = get_password_hash("Dio@sup.2203")
 
 TENANT_TABLES = [
     "users",
@@ -36,65 +40,115 @@ TENANT_TABLES = [
     "audit_logs"
 ]
 
+_migrations_done = False
+
 async def run_multitenant_migrations(conn):
     """
     Executa migrações DDL seguras e idempotentes (PostgreSQL e SQLite)
     para habilitar a arquitetura Multi-Tenant com garantia de Zero Data Loss.
     """
+    global _migrations_done
     logger.info("[MULTI-TENANT] Iniciando migrações de esquema e backfill de dados...")
 
+    # Detecta se é PostgreSQL
+    is_postgres = False
+    try:
+        dialect_name = conn.dialect.name
+        is_postgres = (dialect_name == "postgresql")
+    except Exception:
+        pass
+
     # 1. Criação da tabela 'tenants' se não existir
-    create_tenants_sql = """
-    CREATE TABLE IF NOT EXISTS tenants (
-        id UUID PRIMARY KEY,
-        name VARCHAR(150) NOT NULL,
-        slug VARCHAR(60) UNIQUE NOT NULL,
-        cnpj VARCHAR(25),
-        telephone VARCHAR(50),
-        address VARCHAR(255),
-        cep VARCHAR(20),
-        ie VARCHAR(30),
-        plan_tier VARCHAR(30) DEFAULT 'pro' NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE NOT NULL,
-        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-    """
+    if is_postgres:
+        create_tenants_sql = """
+        CREATE TABLE IF NOT EXISTS tenants (
+            id UUID PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            slug VARCHAR(60) UNIQUE NOT NULL,
+            cnpj VARCHAR(25),
+            telephone VARCHAR(50),
+            address VARCHAR(255),
+            cep VARCHAR(20),
+            ie VARCHAR(30),
+            plan_tier VARCHAR(30) DEFAULT 'pro' NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE NOT NULL,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """
+    else:
+        create_tenants_sql = """
+        CREATE TABLE IF NOT EXISTS tenants (
+            id VARCHAR(36) PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            slug VARCHAR(60) UNIQUE NOT NULL,
+            cnpj VARCHAR(25),
+            telephone VARCHAR(50),
+            address VARCHAR(255),
+            cep VARCHAR(20),
+            ie VARCHAR(30),
+            plan_tier VARCHAR(30) DEFAULT 'pro' NOT NULL,
+            is_active BOOLEAN DEFAULT 1 NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """
+
     try:
         await conn.execute(text(create_tenants_sql))
     except Exception as e:
         logger.warning(f"[MULTI-TENANT] Erro criando tabela tenants: {e}")
 
-    # 2. Garante o registro do Tenant Piloto Default
-    seed_tenant_sql = f"""
-    INSERT INTO tenants (id, name, slug, cnpj, plan_tier, is_active)
-    VALUES ('{DEFAULT_TENANT_ID}', '{DEFAULT_TENANT_NAME}', '{DEFAULT_TENANT_SLUG}', '{DEFAULT_TENANT_CNPJ}', 'enterprise', TRUE)
-    ON CONFLICT (id) DO NOTHING;
-    """
+    # 2. Garante o registro do Tenant Piloto Default (Nova LAB Matriz)
+    if is_postgres:
+        seed_tenant_sql = f"""
+        INSERT INTO tenants (id, name, slug, cnpj, plan_tier, is_active)
+        VALUES ('{DEFAULT_TENANT_ID}', '{DEFAULT_TENANT_NAME}', '{DEFAULT_TENANT_SLUG}', '{DEFAULT_TENANT_CNPJ}', 'enterprise', TRUE)
+        ON CONFLICT (id) DO NOTHING;
+        """
+    else:
+        seed_tenant_sql = f"""
+        INSERT OR IGNORE INTO tenants (id, name, slug, cnpj, plan_tier, is_active)
+        VALUES ('{DEFAULT_TENANT_ID}', '{DEFAULT_TENANT_NAME}', '{DEFAULT_TENANT_SLUG}', '{DEFAULT_TENANT_CNPJ}', 'enterprise', 1);
+        """
     try:
         await conn.execute(text(seed_tenant_sql))
-    except Exception:
-        # Fallback para SQLite que pode não suportar ON CONFLICT (id) da mesma forma
-        try:
-            await conn.execute(text(f"""
-            INSERT OR IGNORE INTO tenants (id, name, slug, cnpj, plan_tier, is_active)
-            VALUES ('{DEFAULT_TENANT_ID}', '{DEFAULT_TENANT_NAME}', '{DEFAULT_TENANT_SLUG}', '{DEFAULT_TENANT_CNPJ}', 'enterprise', 1);
-            """))
-        except Exception:
-            pass
+    except Exception as e:
+        logger.warning(f"[MULTI-TENANT] Erro inserindo tenant default: {e}")
 
-    # 3. Adiciona a coluna is_superadmin na tabela users
-    try:
-        await conn.execute(text("ALTER TABLE users ADD COLUMN is_superadmin BOOLEAN DEFAULT 0;"))
-    except Exception:
-        pass
+    # 3. Adiciona colunas na tabela users
+    if is_postgres:
+        for u_col in [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;"
+        ]:
+            try:
+                await conn.execute(text(u_col))
+            except Exception as e:
+                logger.debug(f"[MULTI-TENANT] users col: {e}")
+    else:
+        for u_col in [
+            "ALTER TABLE users ADD COLUMN is_superadmin BOOLEAN DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN tenant_id VARCHAR(36);"
+        ]:
+            try:
+                await conn.execute(text(u_col))
+            except Exception:
+                pass
 
     # 4. Adiciona a coluna tenant_id em cada tabela operacional
     for tbl in TENANT_TABLES:
-        try:
-            await conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;"))
-        except Exception:
-            # Em SQLite ou caso o tipo UUID dê erro, tenta VARCHAR(36)
+        if tbl == "users":
+            continue
+        if is_postgres:
+            try:
+                await conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;"))
+            except Exception:
+                try:
+                    await conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS tenant_id UUID;"))
+                except Exception:
+                    pass
+        else:
             try:
                 await conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN tenant_id VARCHAR(36);"))
             except Exception:
@@ -111,14 +165,71 @@ async def run_multitenant_migrations(conn):
         except Exception as e:
             logger.debug(f"[MULTI-TENANT] Backfill {tbl}: {e}")
 
-    # 6. Define administradores existentes como superadmins
+    # 6. Configura o usuário 'admin' para ser SOMENTE administrador do laboratório Nova LAB (não SuperAdmin)
     try:
-        await conn.execute(text(f"""
-        UPDATE users 
-        SET is_superadmin = TRUE, tenant_id = '{DEFAULT_TENANT_ID}'
-        WHERE email IN ('admin', 'suporte') OR tenant_id IS NULL;
-        """))
-    except Exception:
-        pass
+        if is_postgres:
+            await conn.execute(text(f"""
+            UPDATE users 
+            SET is_superadmin = FALSE, tenant_id = '{DEFAULT_TENANT_ID}'
+            WHERE lower(email) = 'admin';
+            """))
+        else:
+            await conn.execute(text(f"""
+            UPDATE users 
+            SET is_superadmin = 0, tenant_id = '{DEFAULT_TENANT_ID}'
+            WHERE lower(email) = 'admin';
+            """))
+    except Exception as e:
+        logger.warning(f"[MULTI-TENANT] Erro configurando admin: {e}")
 
+    # 7. Cria ou atualiza o SuperUsuário rafa.busy@gmail.com
+    try:
+        check_res = await conn.execute(text(f"SELECT id FROM users WHERE lower(email) = '{SUPERADMIN_EMAIL.lower()}';"))
+        existing_super = check_res.scalar()
+
+        if existing_super:
+            # Atualiza senha e privilégios
+            if is_postgres:
+                await conn.execute(text(f"""
+                UPDATE users
+                SET hashed_password = '{SUPERADMIN_PASSWORD_HASH}',
+                    is_superadmin = TRUE,
+                    is_active = TRUE,
+                    tenant_id = '{DEFAULT_TENANT_ID}'
+                WHERE id = '{existing_super}';
+                """))
+            else:
+                await conn.execute(text(f"""
+                UPDATE users
+                SET hashed_password = '{SUPERADMIN_PASSWORD_HASH}',
+                    is_superadmin = 1,
+                    is_active = 1,
+                    tenant_id = '{DEFAULT_TENANT_ID}'
+                WHERE id = '{existing_super}';
+                """))
+            logger.info(f"[MULTI-TENANT] SuperAdmin {SUPERADMIN_EMAIL} atualizado com sucesso!")
+        else:
+            # Cria novo usuário SuperAdmin
+            new_super_id = uuid.uuid4()
+            # Tenta pegar role_id do Administrador se existir
+            r_res = await conn.execute(text("SELECT id FROM roles WHERE name = 'Administrador' LIMIT 1;"))
+            role_id = r_res.scalar()
+            role_val = f"'{role_id}'" if role_id else "NULL"
+
+            if is_postgres:
+                insert_super_sql = f"""
+                INSERT INTO users (id, name, email, hashed_password, is_active, must_change_password, is_superadmin, tenant_id, role_id)
+                VALUES ('{new_super_id}', 'SuperAdmin Raphael', '{SUPERADMIN_EMAIL.lower()}', '{SUPERADMIN_PASSWORD_HASH}', TRUE, FALSE, TRUE, '{DEFAULT_TENANT_ID}', {role_val});
+                """
+            else:
+                insert_super_sql = f"""
+                INSERT INTO users (id, name, email, hashed_password, is_active, must_change_password, is_superadmin, tenant_id, role_id)
+                VALUES ('{new_super_id}', 'SuperAdmin Raphael', '{SUPERADMIN_EMAIL.lower()}', '{SUPERADMIN_PASSWORD_HASH}', 1, 0, 1, '{DEFAULT_TENANT_ID}', {role_val});
+                """
+            await conn.execute(text(insert_super_sql))
+            logger.info(f"[MULTI-TENANT] SuperAdmin {SUPERADMIN_EMAIL} criado com sucesso!")
+    except Exception as e:
+        logger.warning(f"[MULTI-TENANT] Erro criando/atualizando SuperAdmin {SUPERADMIN_EMAIL}: {e}")
+
+    _migrations_done = True
     logger.info("[MULTI-TENANT] Migração e Backfill multi-tenant concluídos com sucesso!")

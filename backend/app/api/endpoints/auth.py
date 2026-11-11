@@ -21,6 +21,15 @@ async def login(
     Realiza o login de funcionários da fábrica (Operadores e Administradores)
     utilizando e-mail e senha. Retorna o token JWT e as informações do perfil.
     """
+    # Garante que as migrações Multi-Tenant rodaram antes da consulta de autenticação
+    from backend.app.core.multitenancy import run_multitenant_migrations, _migrations_done
+    if not _migrations_done:
+        try:
+            await run_multitenant_migrations(db)
+            await db.commit()
+        except Exception:
+            pass
+
     # Busca o usuário pelo e-mail (insensível a maiúsculas e sem espaços extras)
     email_clean = payload.email.strip().lower() if payload.email else ""
     query = (

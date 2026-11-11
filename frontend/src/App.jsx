@@ -37,6 +37,7 @@ import FilaOrdensBloqueadas from './components/FilaOrdensBloqueadas';
 import DashboardDRE from './components/DashboardDRE';
 import RelatoriosHub from './pages/reports/RelatoriosHub';
 import TenantManagementModal from './components/TenantManagementModal';
+import PainelLaboratorios from './pages/PainelLaboratorios';
 import { maskCNPJ, maskPhone, maskCEP, maskIE } from './utils/maskHelper';
 import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles, Menu, X, LogOut } from 'lucide-react';
 
@@ -584,6 +585,16 @@ function App() {
                     >
                       <Settings size={14} /> Parâmetros do Sistema
                     </button>
+                    {currentUser?.is_superadmin && (
+                      <button 
+                        type="button"
+                        className={`dropdown-item ${activeTab === 'painel-laboratorios' ? 'active' : ''}`}
+                        onClick={() => { setActiveTab('painel-laboratorios'); setOpenDropdown(null); }}
+                        style={{ color: '#6366f1', fontWeight: 700 }}
+                      >
+                        <Building2 size={14} /> Painel de Laboratórios (Multi-Tenant)
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -606,6 +617,26 @@ function App() {
               <BarChart3 size={16} style={{ color: '#38bdf8' }} /> Relatórios & BI
             </button>
           </div>
+
+          {/* GRUPO 6: Painel Laboratórios (Exclusivo SuperAdmin) */}
+          {currentUser?.is_superadmin && (
+            <div className="header-dropdown">
+              <button 
+                type="button"
+                className={`dropdown-trigger ${activeTab === 'painel-laboratorios' ? 'active' : ''}`}
+                style={{
+                  background: activeTab === 'painel-laboratorios' ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+                  borderColor: activeTab === 'painel-laboratorios' ? '#818cf8' : 'rgba(99, 102, 241, 0.3)',
+                  color: activeTab === 'painel-laboratorios' ? '#ffffff' : '#a5b4fc',
+                  fontWeight: 700
+                }}
+                onClick={() => { setActiveTab('painel-laboratorios'); setOpenDropdown(null); }}
+                title="Administração global de laboratórios ópticos"
+              >
+                <Building2 size={16} style={{ color: '#818cf8' }} /> Laboratórios
+              </button>
+            </div>
+          )}
 
         </nav>
 
@@ -865,6 +896,11 @@ function App() {
                         <button type="button" className={`mobile-nav-item ${activeTab === 'system-parameters' ? 'active' : ''}`} onClick={() => { setActiveTab('system-parameters'); setMobileDrawerOpen(false); }}>
                           <Settings size={16} /> Parâmetros do Sistema
                         </button>
+                        {currentUser?.is_superadmin && (
+                          <button type="button" className={`mobile-nav-item ${activeTab === 'painel-laboratorios' ? 'active' : ''}`} onClick={() => { setActiveTab('painel-laboratorios'); setMobileDrawerOpen(false); }} style={{ color: '#818cf8', fontWeight: 700 }}>
+                            <Building2 size={16} /> Painel Laboratórios
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -995,6 +1031,20 @@ function App() {
 
         {activeTab === 'system-parameters' && currentUser?.role === 'Administrador' && (
           <ParametrosSistema />
+        )}
+
+        {activeTab === 'painel-laboratorios' && currentUser?.is_superadmin && (
+          <PainelLaboratorios
+            currentActiveTenantId={currentUser.active_tenant_id || currentUser.tenant_id}
+            onTenantChange={(selectedTenant) => {
+              setCurrentUser(prev => ({
+                ...prev,
+                active_tenant_id: selectedTenant.id,
+                tenant_name: selectedTenant.name,
+                tenant_slug: selectedTenant.slug
+              }));
+            }}
+          />
         )}
 
         {activeTab === 'supplier-orders' && (
