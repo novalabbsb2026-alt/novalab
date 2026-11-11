@@ -383,8 +383,9 @@ function App() {
           }}
         />
       )}
-      {/* Cabeçalho Premium */}
-      <header className="app-header">
+      {/* Cabeçalho Premium (Oculto no Painel Executivo com Barra Lateral) */}
+      {activeTab !== 'painel-laboratorios' && (
+        <header className="app-header">
         <div className="header-brand-section" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div 
             className="logo-container" 
@@ -763,16 +764,19 @@ function App() {
           </button>
         </div>
       </header>
+      )}
 
       {/* Barra de Pesquisa Rápida Mobile */}
-      <div className="mobile-search-bar">
-        <GlobalSearch onNavigate={(tab, result) => {
-          if (tab) setActiveTab(tab);
-          if (result && result.type === 'os' && result.id) {
-            setSelectedOSIdForModal(result.id);
-          }
-        }} />
-      </div>
+      {activeTab !== 'painel-laboratorios' && (
+        <div className="mobile-search-bar">
+          <GlobalSearch onNavigate={(tab, result) => {
+            if (tab) setActiveTab(tab);
+            if (result && result.type === 'os' && result.id) {
+              setSelectedOSIdForModal(result.id);
+            }
+          }} />
+        </div>
+      )}
 
       {/* Drawer Lateral Mobile */}
       {mobileDrawerOpen && (
@@ -1092,6 +1096,8 @@ function App() {
         {activeTab === 'painel-laboratorios' && currentUser?.is_superadmin && (
           <PainelLaboratorios
             currentActiveTenantId={currentUser.active_tenant_id || currentUser.tenant_id}
+            currentUser={currentUser}
+            laboratory={laboratory}
             onTenantChange={(selectedTenant) => {
               setCurrentUser(prev => ({
                 ...prev,
@@ -1100,6 +1106,8 @@ function App() {
                 tenant_slug: selectedTenant.slug
               }));
             }}
+            onNavigate={(tab) => setActiveTab(tab)}
+            onLogout={handleLogout}
           />
         )}
 
