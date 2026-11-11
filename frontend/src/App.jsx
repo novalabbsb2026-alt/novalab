@@ -327,6 +327,47 @@ function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Banner de Aviso de Modo Impersonate Ativo */}
+      {localStorage.getItem('factory_is_impersonating') === 'true' && (
+        <div style={{
+          backgroundColor: '#E2A336',
+          color: '#000000',
+          padding: '8px 20px',
+          fontSize: '0.82rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          zIndex: 99999,
+          position: 'sticky',
+          top: 0,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Key size={16} />
+            <span>MODO IMPERSONATE ATIVO: Você está acessando a fábrica como <strong>{laboratory.name}</strong>. Todas as ações simulam o ambiente do cliente.</span>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem('factory_is_impersonating');
+              setActiveTab('painel-laboratorios');
+              window.location.reload();
+            }}
+            style={{
+              backgroundColor: '#000000',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '5px',
+              padding: '5px 12px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            Encerrar Acesso & Voltar ao Painel Master
+          </button>
+        </div>
+      )}
       {/* Overlay invisível para fechar dropdown ao clicar fora */}
       {openDropdown && (
         <div 

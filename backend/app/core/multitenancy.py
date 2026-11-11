@@ -139,6 +139,62 @@ async def run_multitenant_migrations(conn):
     except Exception as e:
         logger.warning(f"[MULTI-TENANT] Erro inserindo roles padrão: {e}")
 
+    # 2.2 Cria tabelas para Broadcast e Tickets de Suporte
+    if is_postgres:
+        extra_sql = """
+        CREATE TABLE IF NOT EXISTS broadcast_messages (
+            id UUID PRIMARY KEY,
+            title VARCHAR(150) NOT NULL,
+            message TEXT NOT NULL,
+            type VARCHAR(30) DEFAULT 'info' NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE NOT NULL,
+            target_tenant_id UUID,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id UUID PRIMARY KEY,
+            tenant_id UUID,
+            tenant_name VARCHAR(150),
+            subject VARCHAR(200) NOT NULL,
+            description TEXT NOT NULL,
+            priority VARCHAR(30) DEFAULT 'MEDIA' NOT NULL,
+            status VARCHAR(30) DEFAULT 'ABERTO' NOT NULL,
+            assigned_to VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """
+    else:
+        extra_sql = """
+        CREATE TABLE IF NOT EXISTS broadcast_messages (
+            id VARCHAR(36) PRIMARY KEY,
+            title VARCHAR(150) NOT NULL,
+            message TEXT NOT NULL,
+            type VARCHAR(30) DEFAULT 'info' NOT NULL,
+            is_active BOOLEAN DEFAULT 1 NOT NULL,
+            target_tenant_id VARCHAR(36),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id VARCHAR(36) PRIMARY KEY,
+            tenant_id VARCHAR(36),
+            tenant_name VARCHAR(150),
+            subject VARCHAR(200) NOT NULL,
+            description TEXT NOT NULL,
+            priority VARCHAR(30) DEFAULT 'MEDIA' NOT NULL,
+            status VARCHAR(30) DEFAULT 'ABERTO' NOT NULL,
+            assigned_to VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """
+    try:
+        for stmt in extra_sql.strip().split(';'):
+            if stmt.strip():
+                await conn.execute(text(stmt))
+    except Exception as e:
+        logger.warning(f"[MULTI-TENANT] Erro criando tabelas broadcast/tickets: {e}")
+
     # 3. Adiciona colunas na tabela users
     if is_postgres:
         for u_col in [
