@@ -10,7 +10,8 @@ class CommercialOrder(Base):
     __tablename__ = "commercial_orders"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    order_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
+    order_number: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     optical_store_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("optical_stores.id", ondelete="RESTRICT"), nullable=False, index=True)
     
     client_name: Mapped[Optional[str]] = mapped_column(String(150), default="Cliente Consumidor")

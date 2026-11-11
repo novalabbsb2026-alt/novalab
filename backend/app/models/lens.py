@@ -22,6 +22,7 @@ class LensModel(Base):
     __tablename__ = "lens_models"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     code: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True, nullable=True)
     name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     brand: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -77,6 +78,7 @@ class LensInventoryGrade(Base):
     __tablename__ = "lens_inventory_grade"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     lens_model_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lens_models.id", ondelete="CASCADE"), nullable=False)
     spherical: Mapped[Optional[Decimal]] = mapped_column(Numeric(4, 2), nullable=True)
     cylindrical: Mapped[Optional[Decimal]] = mapped_column(Numeric(4, 2), nullable=True)
@@ -122,6 +124,7 @@ class DegreePricingPolicyRange(Base):
     __tablename__ = "degree_pricing_policy_ranges"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     lens_model_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lens_models.id", ondelete="CASCADE"), nullable=False)
     
     min_spherical: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)

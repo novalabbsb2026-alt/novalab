@@ -9,6 +9,7 @@ class Product(Base):
     __tablename__ = "products"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     sku: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -43,6 +44,7 @@ class Treatment(Base):
     __tablename__ = "treatments"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
@@ -54,6 +56,7 @@ class TechnicalService(Base):
     __tablename__ = "technical_services"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)

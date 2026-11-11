@@ -29,6 +29,8 @@ class UserBase(BaseModel):
     email: str  # Mudado de EmailStr para str para aceitar logins alfanuméricos
     is_active: Optional[bool] = True
     must_change_password: Optional[bool] = False
+    tenant_id: Optional[uuid.UUID] = None
+    is_superadmin: Optional[bool] = False
 
 class UserCreate(UserBase):
     password: str
@@ -41,11 +43,15 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     role_id: Optional[uuid.UUID] = None
     must_change_password: Optional[bool] = None
+    tenant_id: Optional[uuid.UUID] = None
+    is_superadmin: Optional[bool] = None
 
 class UserResponse(UserBase):
     id: uuid.UUID
     role_id: Optional[uuid.UUID] = None
     role: Optional[RoleResponse] = None
+    tenant_name: Optional[str] = None
+    tenant_slug: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -56,6 +62,10 @@ class Token(BaseModel):
     role: str
     name: str
     must_change_password: bool
+    tenant_id: Optional[uuid.UUID] = None
+    tenant_name: Optional[str] = None
+    tenant_slug: Optional[str] = None
+    is_superadmin: bool = False
 
 class TokenPayload(BaseModel):
     sub: Optional[str] = None

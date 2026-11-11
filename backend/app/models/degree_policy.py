@@ -10,6 +10,7 @@ class DegreePricingPolicy(Base):
     __tablename__ = "degree_pricing_policy"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     degree_threshold: Mapped[Decimal] = mapped_column(Numeric(4, 2), default=Decimal("2.00"), nullable=False)
     default_sale_price_le: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("75.00"), nullable=False)
     default_sale_price_gt: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("95.00"), nullable=False)

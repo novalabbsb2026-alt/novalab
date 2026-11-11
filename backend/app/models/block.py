@@ -10,6 +10,7 @@ class BlockModel(Base):
     __tablename__ = "block_models"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     brand: Mapped[str] = mapped_column(String(100), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     material: Mapped[str] = mapped_column(String(50), default="CR-39", nullable=False)
@@ -34,6 +35,7 @@ class BlockGridItem(Base):
     __tablename__ = "block_grid_items"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     block_model_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("block_models.id", ondelete="CASCADE"), nullable=False)
     base_curve: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)   # 2.00, 4.00, 6.00
     addition: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)     # 0.00, 1.00 ... 3.00

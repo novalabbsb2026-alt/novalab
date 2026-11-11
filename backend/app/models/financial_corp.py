@@ -9,7 +9,8 @@ class CostCenter(Base):
     __tablename__ = "cost_centers"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -17,6 +18,7 @@ class FinancialCategory(Base):
     __tablename__ = "financial_categories"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     type: Mapped[str] = mapped_column(String(20), nullable=False) # 'RECEITA', 'DESPESA'
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -25,6 +27,7 @@ class AccountsPayable(Base):
     __tablename__ = "accounts_payable"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     supplier_name: Mapped[str] = mapped_column(String(150), nullable=False)
     document_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -56,6 +59,7 @@ class AccountsReceivable(Base):
     __tablename__ = "accounts_receivable"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     billing_cycle_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("billing_cycles.id", ondelete="SET NULL"), nullable=True, index=True)
     optical_store_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("optical_stores.id", ondelete="RESTRICT"), nullable=False, index=True)
     
@@ -78,6 +82,7 @@ class FinancialTransaction(Base):
     __tablename__ = "financial_transactions"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     type: Mapped[str] = mapped_column(String(20), nullable=False) # 'RECEITA', 'DESPESA'
     category: Mapped[str] = mapped_column(String(100), default="OUTROS", nullable=False) # 'FOLHA', 'FORNECEDOR', 'OPERACIONAL', 'FATURAMENTO', 'OUTROS'
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)

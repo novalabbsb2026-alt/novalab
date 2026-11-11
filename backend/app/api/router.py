@@ -3,7 +3,7 @@ from backend.app.api.endpoints import (
     lens_models, inventory, movements, nfe, alerts, os as endpoints_os, analytics as endpoints_analytics,
     partner, factory, auth, optical_stores, financial_catalog, customer_price, billing, users, laboratory,
     search as endpoints_search, tv as endpoints_tv, backup, financial_corp, system_parameters, supplier_order, blocks, orders,
-    degree_policy, reports, reports_export
+    degree_policy, reports, reports_export, tenants
 )
 
 
@@ -54,6 +54,9 @@ api_router.include_router(endpoints_search.router, prefix="/search", tags=["Pesq
 
 # Paineis de TV (publicos — sem autenticacao, para exibicao em televisoes da fabrica)
 api_router.include_router(endpoints_tv.router, prefix="/tv", tags=["Paineis de TV"])
+
+# Gestão de Laboratórios Multi-Tenant
+api_router.include_router(tenants.router, prefix="/tenants", tags=["Gestão de Laboratórios Multi-Tenant"])
 
 
 

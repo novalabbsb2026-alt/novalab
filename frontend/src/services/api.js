@@ -32,12 +32,16 @@ const api = axios.create({
   },
 });
 
-// --- Interceptor de Request: injeta o token JWT automaticamente ---
+// --- Interceptor de Request: injeta o token JWT e o Tenant ID ativo automaticamente ---
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('factory_token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    const activeTenantId = localStorage.getItem('factory_active_tenant_id');
+    if (activeTenantId) {
+      config.headers['X-Tenant-ID'] = activeTenantId;
     }
     return config;
   },
@@ -57,6 +61,11 @@ api.interceptors.response.use(
       localStorage.removeItem('factory_token');
       localStorage.removeItem('factory_user_role');
       localStorage.removeItem('factory_user_name');
+      localStorage.removeItem('factory_tenant_id');
+      localStorage.removeItem('factory_tenant_name');
+      localStorage.removeItem('factory_tenant_slug');
+      localStorage.removeItem('factory_is_superadmin');
+      localStorage.removeItem('factory_active_tenant_id');
       // Dispara evento para que o App.jsx reaja sem importação circular
       window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: detail || 'Sessão expirada' } }));
     } else if (status === 403) {
@@ -74,6 +83,11 @@ export const logout = () => {
   localStorage.removeItem('factory_token');
   localStorage.removeItem('factory_user_role');
   localStorage.removeItem('factory_user_name');
+  localStorage.removeItem('factory_tenant_id');
+  localStorage.removeItem('factory_tenant_name');
+  localStorage.removeItem('factory_tenant_slug');
+  localStorage.removeItem('factory_is_superadmin');
+  localStorage.removeItem('factory_active_tenant_id');
   window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: 'logout_manual' } }));
 };
 

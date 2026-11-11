@@ -26,7 +26,7 @@ async def login(
     query = (
         select(User)
         .where(func.lower(User.email) == email_clean)
-        .options(selectinload(User.role))
+        .options(selectinload(User.role), selectinload(User.tenant))
     )
     result = await db.execute(query)
     user = result.scalars().first()
@@ -57,12 +57,20 @@ async def login(
     # Obtém o nome da role
     role_name = user.role.name if user.role else "Operador"
     
+    tenant_id = user.tenant_id
+    tenant_name = user.tenant.name if user.tenant else "Nova LAB Matriz"
+    tenant_slug = user.tenant.slug if user.tenant else "matriz"
+
     return Token(
         access_token=access_token,
         token_type="bearer",
         role=role_name,
         name=user.name,
-        must_change_password=user.must_change_password
+        must_change_password=user.must_change_password,
+        tenant_id=tenant_id,
+        tenant_name=tenant_name,
+        tenant_slug=tenant_slug,
+        is_superadmin=bool(user.is_superadmin)
     )
 
 @router.get("/me", response_model=UserResponse)

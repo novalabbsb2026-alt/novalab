@@ -56,6 +56,8 @@ from datetime import datetime, timezone
 
 # ContextVar para guardar informações do usuário atual (logado)
 current_user_ctx: contextvars.ContextVar[dict] = contextvars.ContextVar("current_user", default=None)
+# ContextVar para guardar informações do laboratório/tenant atual
+current_tenant_ctx: contextvars.ContextVar[dict] = contextvars.ContextVar("current_tenant", default=None)
 
 def _strip_tz(val):
     if isinstance(val, datetime) and val.tzinfo is not None:
@@ -85,6 +87,39 @@ def _normalize_query_datetime_params(conn, cursor, statement, parameters, contex
             parameters = new_params
     return statement, parameters
 
+@event.listens_for(Session, "do_orm_execute")
+def receive_do_orm_execute(execute_state):
+    """
+    Interceptor do SQLAlchemy para particionamento Multi-Tenant seguro.
+    Aplica automaticamente o critério de filtro WHERE tenant_id = :active_tenant_id
+    em todas as consultas ORM para entidades que possuem a coluna tenant_id.
+    """
+    from sqlalchemy.orm import with_loader_criteria
+    tenant_info = current_tenant_ctx.get()
+    if (
+        execute_state.is_select
+        and not execute_state.is_column_load
+        and not execute_state.is_relationship_load
+        and tenant_info
+        and tenant_info.get("id")
+    ):
+        if execute_state.execution_options.get("include_all_tenants", False):
+            return
+
+        active_t_id = tenant_info.get("id")
+
+        for mapper in Base.registry.mappers:
+            cls = mapper.class_
+            if hasattr(cls, "tenant_id") and cls.__name__ != "Tenant":
+                execute_state.statement = execute_state.statement.options(
+                    with_loader_criteria(
+                        cls,
+                        lambda c: c.tenant_id == active_t_id,
+                        include_aliases=True,
+                        track_closure_variables=False
+                    )
+                )
+
 @event.listens_for(Session, "before_flush")
 def receive_before_flush(session, flush_context, instances):
     from backend.app.models.audit import AuditLog
@@ -98,6 +133,18 @@ def receive_before_flush(session, flush_context, instances):
                     setattr(obj, mapper_attr.key, val.astimezone(timezone.utc).replace(tzinfo=None))
     
     user_info = current_user_ctx.get()
+    tenant_info = current_tenant_ctx.get()
+    current_t_id = None
+    if tenant_info and tenant_info.get("id"):
+        raw_t_id = tenant_info.get("id")
+        if isinstance(raw_t_id, str):
+            try:
+                current_t_id = uuid.UUID(raw_t_id)
+            except Exception:
+                current_t_id = raw_t_id
+        else:
+            current_t_id = raw_t_id
+
     user_id = None
     user_name = "Sistema"
     if user_info:
@@ -120,6 +167,10 @@ def receive_before_flush(session, flush_context, instances):
         if obj.__class__.__name__ == "AuditLog":
             continue
         
+        # Auto-popula tenant_id caso a entidade pertença a um tenant e não tenha sido informado explicitamente
+        if current_t_id and hasattr(obj, "tenant_id") and getattr(obj, "tenant_id", None) is None:
+            setattr(obj, "tenant_id", current_t_id)
+
         attrs = {}
         for mapper_attr in obj.__mapper__.column_attrs:
             val = getattr(obj, mapper_attr.key)
@@ -141,6 +192,7 @@ def receive_before_flush(session, flush_context, instances):
                 record_id = ",".join(pks)
         
         audit = AuditLog(
+            tenant_id=getattr(obj, "tenant_id", current_t_id),
             user_id=user_id,
             user_name=user_name,
             action="CREATE",

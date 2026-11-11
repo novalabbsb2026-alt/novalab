@@ -1,8 +1,11 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import String, Boolean, ForeignKey, Uuid, Table, Column, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.core.database import Base
+
+if TYPE_CHECKING:
+    from backend.app.models.tenant import Tenant
 
 # Tabela associativa N:N para perfis e permissões
 role_permissions = Table(
@@ -50,9 +53,15 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     role_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
     )
     
     # Relacionamentos
     role: Mapped[Optional[Role]] = relationship("Role", back_populates="users")
+    tenant: Mapped[Optional["Tenant"]] = relationship("Tenant", back_populates="users")

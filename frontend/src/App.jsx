@@ -36,6 +36,7 @@ import OSDetail from './components/OSDetail';
 import FilaOrdensBloqueadas from './components/FilaOrdensBloqueadas';
 import DashboardDRE from './components/DashboardDRE';
 import RelatoriosHub from './pages/reports/RelatoriosHub';
+import TenantManagementModal from './components/TenantManagementModal';
 import { maskCNPJ, maskPhone, maskCEP, maskIE } from './utils/maskHelper';
 import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles, Menu, X, LogOut } from 'lucide-react';
 
@@ -49,28 +50,29 @@ function App() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [mobileExpandedGroup, setMobileExpandedGroup] = useState('estoque');
 
-
-
-
-
-
   
   // Estado para controle do modal de fallback global
   const [fallbackData, setFallbackData] = useState(null); // { barcode, quantity }
 
   const [openDropdown, setOpenDropdown] = useState(null); // 'estoque', 'os', 'comercial', 'sistema' ou null
 
-  // Estado de autenticação do operador da fábrica
+  // Estado de autenticação do operador da fábrica com suporte Multi-Tenant
   const [currentUser, setCurrentUser] = useState(() => {
     const token = localStorage.getItem('factory_token');
     const role = localStorage.getItem('factory_user_role');
     const name = localStorage.getItem('factory_user_name');
+    const tenant_id = localStorage.getItem('factory_tenant_id');
+    const tenant_name = localStorage.getItem('factory_tenant_name') || 'Nova LAB Matriz';
+    const tenant_slug = localStorage.getItem('factory_tenant_slug') || 'matriz';
+    const is_superadmin = localStorage.getItem('factory_is_superadmin') === 'true';
+    const active_tenant_id = localStorage.getItem('factory_active_tenant_id') || tenant_id;
     if (token && role && name) {
-      return { token, role, name };
+      return { token, role, name, tenant_id, tenant_name, tenant_slug, is_superadmin, active_tenant_id };
     }
     return null;
   });
 
+  const [showTenantModal, setShowTenantModal] = useState(false);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
 
   useEffect(() => {
@@ -168,6 +170,11 @@ function App() {
     localStorage.removeItem('factory_token');
     localStorage.removeItem('factory_user_role');
     localStorage.removeItem('factory_user_name');
+    localStorage.removeItem('factory_tenant_id');
+    localStorage.removeItem('factory_tenant_name');
+    localStorage.removeItem('factory_tenant_slug');
+    localStorage.removeItem('factory_is_superadmin');
+    localStorage.removeItem('factory_active_tenant_id');
     setCurrentUser(null);
     setActiveTab('relatorios-bi');
   };
@@ -178,6 +185,9 @@ function App() {
     const interceptor = api.interceptors.request.use((config) => {
       if (currentUser) {
         config.headers['Authorization'] = `Bearer ${currentUser.token}`;
+        if (currentUser.active_tenant_id) {
+          config.headers['X-Tenant-ID'] = currentUser.active_tenant_id;
+        }
       }
       return config;
     }, (error) => {
@@ -188,6 +198,9 @@ function App() {
     const globalInterceptor = axios.interceptors.request.use((config) => {
       if (currentUser) {
         config.headers['Authorization'] = `Bearer ${currentUser.token}`;
+        if (currentUser.active_tenant_id) {
+          config.headers['X-Tenant-ID'] = currentUser.active_tenant_id;
+        }
       }
       return config;
     }, (error) => {
@@ -596,8 +609,41 @@ function App() {
 
         </nav>
 
-        {/* Informações do usuário logado (Desktop) */}
-        <div className="user-desktop-info" style={{ display: 'flex', alignItems: 'center', gap: '15px', paddingRight: '20px' }}>
+        {/* Informações do usuário logado & Seletor de Laboratório Multi-Tenant (Desktop) */}
+        <div className="user-desktop-info" style={{ display: 'flex', alignItems: 'center', gap: '14px', paddingRight: '20px' }}>
+          {/* Badge / Seletor do Tenant Ativo */}
+          <div
+            onClick={() => currentUser.is_superadmin && setShowTenantModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              backgroundColor: currentUser.is_superadmin ? '#f5f3ff' : 'hsl(var(--bg-card))',
+              border: currentUser.is_superadmin ? '1px solid #c7d2fe' : '1px solid hsl(var(--border))',
+              cursor: currentUser.is_superadmin ? 'pointer' : 'default',
+              transition: 'all 0.15s ease'
+            }}
+            title={currentUser.is_superadmin ? "Gerenciar e alternar laboratórios (SuperAdmin)" : "Laboratório Ativo"}
+          >
+            <Building2 size={16} style={{ color: currentUser.is_superadmin ? '#6366f1' : 'hsl(var(--primary))' }} />
+            <div style={{ textAlign: 'left', lineHeight: 1.15 }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: currentUser.is_superadmin ? '#4338ca' : 'hsl(var(--text-primary))', display: 'block' }}>
+                {currentUser.tenant_name || 'Nova LAB Matriz'}
+              </span>
+              {currentUser.is_superadmin ? (
+                <span style={{ fontSize: '0.62rem', color: '#6366f1', fontWeight: 700 }}>
+                  Alternar Laboratório ▾
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.62rem', color: 'hsl(var(--text-muted))', fontWeight: 600 }}>
+                  {currentUser.tenant_slug || 'matriz'}
+                </span>
+              )}
+            </div>
+          </div>
+
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'hsl(var(--text-primary))', display: 'block' }}>{currentUser.name}</span>
             <span style={{ fontSize: '0.7rem', color: 'hsl(var(--secondary))', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>{currentUser.role}</span>
@@ -1161,6 +1207,23 @@ function App() {
             />
           </div>
         </div>
+      )}
+
+      {/* Modal de Gestão Multi-Tenant para SuperAdmin */}
+      {currentUser?.is_superadmin && (
+        <TenantManagementModal
+          isOpen={showTenantModal}
+          onClose={() => setShowTenantModal(false)}
+          currentActiveTenantId={currentUser.active_tenant_id || currentUser.tenant_id}
+          onSelectTenant={(selectedTenant) => {
+            setCurrentUser(prev => ({
+              ...prev,
+              active_tenant_id: selectedTenant.id,
+              tenant_name: selectedTenant.name,
+              tenant_slug: selectedTenant.slug
+            }));
+          }}
+        />
       )}
     </div>
   );

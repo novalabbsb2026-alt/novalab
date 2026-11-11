@@ -1,4 +1,5 @@
 from backend.app.core.database import Base
+from backend.app.models.tenant import Tenant
 from backend.app.models.lens import LensModel, LensInventoryGrade, DegreePricingPolicyRange, MatrixType, ProductionRoute
 from backend.app.models.movement import StockMovement
 
@@ -21,6 +22,7 @@ from backend.app.models.commercial_order import CommercialOrder, CommercialOrder
 
 __all__ = [
     "Base", 
+    "Tenant",
     "LensModel", 
     "LensInventoryGrade", 
     "DegreePricingPolicyRange",

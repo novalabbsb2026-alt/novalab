@@ -34,11 +34,21 @@ const Login = ({ onLoginSuccess }) => {
         password: password,
       });
 
-      const { access_token, role, name, must_change_password } = response.data;
+      const { access_token, role, name, must_change_password, tenant_id, tenant_name, tenant_slug, is_superadmin } = response.data;
       
+      const sessionUser = {
+        token: access_token,
+        role,
+        name,
+        tenant_id,
+        tenant_name: tenant_name || 'Nova LAB Matriz',
+        tenant_slug: tenant_slug || 'matriz',
+        is_superadmin: Boolean(is_superadmin)
+      };
+
       if (must_change_password) {
         // Retém o fluxo e abre o modal de primeiro acesso
-        setTempLoginData({ token: access_token, role, name });
+        setTempLoginData(sessionUser);
         setShowFirstAccessModal(true);
       } else {
         // Salva no localStorage
@@ -46,10 +56,14 @@ const Login = ({ onLoginSuccess }) => {
         localStorage.setItem('token', access_token);
         localStorage.setItem('factory_user_role', role);
         localStorage.setItem('factory_user_name', name);
-
+        localStorage.setItem('factory_tenant_id', tenant_id || '');
+        localStorage.setItem('factory_tenant_name', tenant_name || 'Nova LAB Matriz');
+        localStorage.setItem('factory_tenant_slug', tenant_slug || 'matriz');
+        localStorage.setItem('factory_is_superadmin', is_superadmin ? 'true' : 'false');
+        localStorage.setItem('factory_active_tenant_id', tenant_id || '');
 
         // Dispara o callback de sucesso
-        onLoginSuccess({ token: access_token, role, name });
+        onLoginSuccess(sessionUser);
       }
     } catch (err) {
       console.error(err);
@@ -97,7 +111,11 @@ const Login = ({ onLoginSuccess }) => {
       localStorage.setItem('token', tempLoginData.token);
       localStorage.setItem('factory_user_role', tempLoginData.role);
       localStorage.setItem('factory_user_name', tempLoginData.name);
-
+      localStorage.setItem('factory_tenant_id', tempLoginData.tenant_id || '');
+      localStorage.setItem('factory_tenant_name', tempLoginData.tenant_name || 'Nova LAB Matriz');
+      localStorage.setItem('factory_tenant_slug', tempLoginData.tenant_slug || 'matriz');
+      localStorage.setItem('factory_is_superadmin', tempLoginData.is_superadmin ? 'true' : 'false');
+      localStorage.setItem('factory_active_tenant_id', tempLoginData.tenant_id || '');
 
       // Dispara o callback de sucesso
       onLoginSuccess(tempLoginData);

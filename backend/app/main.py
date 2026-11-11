@@ -20,6 +20,7 @@ from sqlalchemy import select, and_, or_, text
 from sqlalchemy.orm import selectinload
 from backend.app.core.config import settings
 from backend.app.core.database import engine, Base
+from backend.app.core.multitenancy import run_multitenant_migrations
 from backend.app.api.router import api_router
 from backend.app.models import * # Garante que os modelos estão registrados na Base
 
@@ -110,6 +111,12 @@ async def startup_event():
 
             # Cria as tabelas do banco de dados assincronamente se não existirem
             await conn.run_sync(Base.metadata.create_all)
+
+            # Executa migrações Multi-Tenant idempotentes com garantia de Zero Data Loss
+            try:
+                await run_multitenant_migrations(conn)
+            except Exception as mt_err:
+                print(f"[MULTI-TENANT] Aviso na migração: {mt_err}")
             
             # Adiciona coluna sale_price na tabela lens_models se ela não existir
             try:

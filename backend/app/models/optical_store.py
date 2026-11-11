@@ -10,6 +10,7 @@ class OpticalStore(Base):
     __tablename__ = "optical_stores"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     corporate_name: Mapped[str] = mapped_column(String(200), nullable=False)
     trade_name: Mapped[str] = mapped_column(String(150), nullable=False)
     cnpj: Mapped[str] = mapped_column(String(18), unique=True, nullable=False, index=True)

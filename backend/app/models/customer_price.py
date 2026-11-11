@@ -9,6 +9,7 @@ class CustomerPriceTable(Base):
     __tablename__ = "customer_price_tables"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     optical_store_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("optical_stores.id", ondelete="CASCADE"), nullable=False, index=True

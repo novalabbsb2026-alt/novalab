@@ -36,7 +36,8 @@ class ServiceOrder(Base):
     __tablename__ = "service_orders"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    os_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
+    os_number: Mapped[str] = mapped_column(String(50), nullable=False)
     client_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     status: Mapped[str] = mapped_column(
         String(50), 
