@@ -45,7 +45,10 @@ import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarC
 
 
 function App() {
-  const [activeTab, setActiveTab] = useState('relatorios-bi');
+  const [activeTab, setActiveTab] = useState(() => {
+    const isSuper = localStorage.getItem('factory_is_superadmin') === 'true';
+    return isSuper ? 'painel-laboratorios' : 'relatorios-bi';
+  });
   const [selectedOSIdForModal, setSelectedOSIdForModal] = useState(null);
   const [toast, setToast] = useState(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -164,7 +167,11 @@ function App() {
 
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
-    setActiveTab('relatorios-bi');
+    if (userData && userData.is_superadmin) {
+      setActiveTab('painel-laboratorios');
+    } else {
+      setActiveTab('relatorios-bi');
+    }
   };
 
   const handleLogout = () => {
@@ -338,11 +345,35 @@ function App() {
       {/* Cabeçalho Premium */}
       <header className="app-header">
         <div className="header-brand-section" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div className="logo-container" onClick={handleOpenLabModal} style={{ cursor: 'pointer' }} title="Clique para editar dados do laboratório">
+          <div 
+            className="logo-container" 
+            onClick={() => {
+              if (currentUser?.is_superadmin) {
+                setActiveTab('painel-laboratorios');
+              } else {
+                handleOpenLabModal();
+              }
+            }} 
+            style={{ cursor: 'pointer' }} 
+            title={currentUser?.is_superadmin ? "Ir para o Painel de Laboratórios" : "Clique para editar dados do laboratório"}
+          >
             <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'hsl(var(--text-primary))', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {laboratory.name.split(' ')[0]}<span style={{ color: 'hsl(var(--secondary))' }}>{laboratory.name.split(' ').slice(1).join(' ') || ''}</span>
+              {currentUser?.is_superadmin ? 'Opti' : laboratory.name.split(' ')[0]}
+              <span style={{ color: 'hsl(var(--secondary))' }}>
+                {currentUser?.is_superadmin ? 'Mind' : (laboratory.name.split(' ').slice(1).join(' ') || '')}
+              </span>
             </span>
-            <span className="logo-badge">Fábrica</span>
+            <span 
+              className="logo-badge" 
+              style={{
+                background: currentUser?.is_superadmin ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : undefined,
+                color: '#ffffff',
+                fontWeight: 800,
+                letterSpacing: '0.5px'
+              }}
+            >
+              {currentUser?.is_superadmin ? 'SUPERADMIN' : 'Fábrica'}
+            </span>
           </div>
           {/* Pesquisa Global Desktop */}
           <div className="desktop-search-wrapper">
@@ -357,12 +388,31 @@ function App() {
 
         <nav className="nav-tabs nav-desktop-tabs" style={{ gap: '15px', background: 'transparent', border: 'none', boxShadow: 'none', overflow: 'visible' }}>
 
-
-
-
-
-
-
+          {/* DESTAQUE PRINCIPAL: Painel de Laboratórios (Exclusivo SuperAdmin) */}
+          {currentUser?.is_superadmin && (
+            <div className="header-dropdown">
+              <button 
+                type="button"
+                className={`dropdown-trigger ${activeTab === 'painel-laboratorios' ? 'active' : ''}`}
+                style={{
+                  background: activeTab === 'painel-laboratorios' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'rgba(99, 102, 241, 0.15)',
+                  border: '1px solid #818cf8',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  boxShadow: activeTab === 'painel-laboratorios' ? '0 4px 12px rgba(79, 70, 229, 0.4)' : 'none',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onClick={() => { setActiveTab('painel-laboratorios'); setOpenDropdown(null); }}
+                title="Administração global de laboratórios cadastrados"
+              >
+                <Building2 size={18} style={{ color: '#ffffff' }} /> Painel de Laboratórios
+              </button>
+            </div>
+          )}
 
           {/* GRUPO 1: Estoque & Grade */}
           <div className="header-dropdown">
@@ -617,26 +667,6 @@ function App() {
               <BarChart3 size={16} style={{ color: '#38bdf8' }} /> Relatórios & BI
             </button>
           </div>
-
-          {/* GRUPO 6: Painel Laboratórios (Exclusivo SuperAdmin) */}
-          {currentUser?.is_superadmin && (
-            <div className="header-dropdown">
-              <button 
-                type="button"
-                className={`dropdown-trigger ${activeTab === 'painel-laboratorios' ? 'active' : ''}`}
-                style={{
-                  background: activeTab === 'painel-laboratorios' ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
-                  borderColor: activeTab === 'painel-laboratorios' ? '#818cf8' : 'rgba(99, 102, 241, 0.3)',
-                  color: activeTab === 'painel-laboratorios' ? '#ffffff' : '#a5b4fc',
-                  fontWeight: 700
-                }}
-                onClick={() => { setActiveTab('painel-laboratorios'); setOpenDropdown(null); }}
-                title="Administração global de laboratórios ópticos"
-              >
-                <Building2 size={16} style={{ color: '#818cf8' }} /> Laboratórios
-              </button>
-            </div>
-          )}
 
         </nav>
 
@@ -1265,6 +1295,7 @@ function App() {
           isOpen={showTenantModal}
           onClose={() => setShowTenantModal(false)}
           currentActiveTenantId={currentUser.active_tenant_id || currentUser.tenant_id}
+          onOpenFullPanel={() => setActiveTab('painel-laboratorios')}
           onSelectTenant={(selectedTenant) => {
             setCurrentUser(prev => ({
               ...prev,

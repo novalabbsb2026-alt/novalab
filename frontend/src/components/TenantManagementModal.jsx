@@ -3,7 +3,7 @@ import axios from 'axios';
 import { getBaseUrl } from '../services/api';
 import { Building2, Plus, CheckCircle2, RefreshCw, X, Shield, ExternalLink, ArrowRight, Store } from 'lucide-react';
 
-export default function TenantManagementModal({ isOpen, onClose, currentActiveTenantId, onSelectTenant }) {
+export default function TenantManagementModal({ isOpen, onClose, currentActiveTenantId, onSelectTenant, onOpenFullPanel }) {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -271,6 +271,29 @@ export default function TenantManagementModal({ isOpen, onClose, currentActiveTe
                   >
                     <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Atualizar
                   </button>
+                  {onOpenFullPanel && (
+                    <button
+                      onClick={() => {
+                        onClose();
+                        onOpenFullPanel();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #c7d2fe',
+                        backgroundColor: '#eef2ff',
+                        color: '#4338ca',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <ExternalLink size={14} /> Abrir Painel Completo
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowCreateForm(true)}
                     style={{
