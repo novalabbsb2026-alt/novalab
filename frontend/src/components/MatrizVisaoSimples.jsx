@@ -236,6 +236,22 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
   const cellQ = (bk, ck) => cell(bk, ck).qty;
   const cellI = (bk, ck) => cell(bk, ck).items;
 
+  const visibleColumns = (() => {
+    let cols = showFullRange ? columns : columns.filter(c => !c.key.includes("167"));
+    if (filterTreatment) {
+      const targetLower = filterTreatment.trim().toLowerCase();
+      const matched = cols.filter(c => c.treatments && c.treatments.some(t => t === targetLower || targetLower.includes(t) || t.includes(targetLower)));
+      if (matched.length > 0) return matched;
+      const customMatch = cols.filter(c => c.label.toLowerCase() === targetLower || c.key.toLowerCase().includes(targetLower));
+      if (customMatch.length > 0) return customMatch;
+    }
+    return cols;
+  })();
+
+  const visibleBases = searchBase
+    ? bases.filter(b => b.label.toLowerCase().includes(searchBase.toLowerCase()) || b.key === searchBase || b.fullLabel.toLowerCase().includes(searchBase.toLowerCase()))
+    : bases;
+
   const rowTotal   = bk => visibleColumns.reduce((a, c) => a + cellQ(bk, c.key), 0);
   const colTotal   = ck => bases.reduce((a, b) => a + cellQ(b.key, ck), 0);
   const grandTotal = ()  => bases.reduce((a, b) => a + rowTotal(b.key), 0);
@@ -343,20 +359,6 @@ export default function MatrizVisaoSimples({ onOpenManualInsert }) {
     w.print();
   };
 
-  const visibleColumns = (() => {
-    let cols = showFullRange ? columns : columns.filter(c => !c.key.includes("167"));
-    if (filterTreatment) {
-      const targetLower = filterTreatment.trim().toLowerCase();
-      const matched = cols.filter(c => c.treatments && c.treatments.some(t => t === targetLower || targetLower.includes(t) || t.includes(targetLower)));
-      if (matched.length > 0) return matched;
-      const customMatch = cols.filter(c => c.label.toLowerCase() === targetLower || c.key.toLowerCase().includes(targetLower));
-      if (customMatch.length > 0) return customMatch;
-    }
-    return cols;
-  })();
-  const visibleBases = searchBase
-    ? bases.filter(b => b.label.toLowerCase().includes(searchBase.toLowerCase()) || b.key === searchBase || b.fullLabel.toLowerCase().includes(searchBase.toLowerCase()))
-    : bases;
   const gt = grandTotal();
 
   // Celulas selecionadas (para o modal)
