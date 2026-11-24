@@ -379,7 +379,15 @@ async def get_service_orders(
         else:
             status_val = status.value if hasattr(status, 'value') else str(status)
 
-        if status_val in ["CQ", "CQ Final"]:
+        if status_val in ["Em Produção", "EM_PRODUCAO", "Ativas", "Bancada", "Producao_Agil"]:
+            query = query.where(ServiceOrder.status.in_([
+                "Recebida", "Separação", "Produção", "Surfaçagem", "Montagem", "CQ", "CQ Final", "Expedição",
+                OSStatus.RECEBIDA, OSStatus.SEPARACAO, OSStatus.PRODUCAO, OSStatus.SURFACAGEM, 
+                OSStatus.MONTAGEM, OSStatus.CQ, OSStatus.CQ_FINAL, OSStatus.EXPEDICAO
+            ]))
+        elif status_val in ["Concluída", "Concluidas", "Prontas", "Concluídas"]:
+            query = query.where(ServiceOrder.status.in_(["Concluída", "Entregue", OSStatus.CONCLUIDA, OSStatus.ENTREGUE]))
+        elif status_val in ["CQ", "CQ Final"]:
             query = query.where(ServiceOrder.status.in_(["CQ", "CQ Final"]))
         elif status_val in ["Produção", "Surfaçagem"]:
             query = query.where(ServiceOrder.status.in_(["Produção", "Surfaçagem"]))
@@ -811,11 +819,13 @@ async def reprocess_broken_lenses(
         return False, "Ordem de Serviço não encontrada.", None
         
     if os_obj.status not in [
+        OSStatus.RECEBIDA, OSStatus.RECEBIDA.value, "Recebida",
         OSStatus.SEPARACAO, OSStatus.PRODUCAO, OSStatus.MONTAGEM, OSStatus.CQ,
         OSStatus.SEPARACAO.value, OSStatus.PRODUCAO.value, OSStatus.MONTAGEM.value, OSStatus.CQ.value,
         OSStatus.CQ_FINAL.value, OSStatus.CQ_FINAL,
         "Separação", "Produção", "Surfaçagem", "Montagem", "CQ", "CQ Final",
-        OSStatus.SURFACAGEM, OSStatus.SURFACAGEM.value
+        OSStatus.SURFACAGEM, OSStatus.SURFACAGEM.value,
+        OSStatus.EXPEDICAO, OSStatus.EXPEDICAO.value, "Expedição"
     ]:
         return False, f"Reprocessamento não permitido para OS no estado {os_obj.status}.", os_obj
         

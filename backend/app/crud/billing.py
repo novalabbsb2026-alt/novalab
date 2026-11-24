@@ -314,6 +314,50 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
     from backend.app.schemas.billing import OSItemDetail
     detailed: List[OSItemDetail] = []
 
+    # Extração e Formatação da Prescrição Médica (OD / OE)
+    def _format_dioptry(sph, cyl, axis, add):
+        parts = []
+        if sph is not None:
+            parts.append(f"Esf {float(sph):+.2f}")
+        if cyl is not None:
+            parts.append(f"Cil {float(cyl):+.2f}")
+        if axis is not None and int(axis) != 0:
+            parts.append(f"Eixo {int(axis)}°")
+        if add is not None and float(add) > 0:
+            parts.append(f"Adição {float(add):+.2f}")
+        return " ".join(parts) if parts else None
+
+    od_presc = _format_dioptry(
+        getattr(order, "od_spherical", None),
+        getattr(order, "od_cylindrical", None),
+        getattr(order, "od_axis", None),
+        getattr(order, "od_addition", None)
+    )
+    oe_presc = _format_dioptry(
+        getattr(order, "oe_spherical", None),
+        getattr(order, "oe_cylindrical", None),
+        getattr(order, "oe_axis", None),
+        getattr(order, "oe_addition", None)
+    )
+    item.od_prescription = od_presc
+    item.oe_prescription = oe_presc
+
+    # Extração dos Metadados da Lente
+    lm = getattr(order, "lens_model", None)
+    if not lm and getattr(order, "od_lens_inventory", None):
+        lm = getattr(order.od_lens_inventory, "lens_model", None)
+    if not lm and getattr(order, "oe_lens_inventory", None):
+        lm = getattr(order.oe_lens_inventory, "lens_model", None)
+
+    lens_brand = getattr(lm, "brand", None) if lm else None
+    lens_model_name = getattr(lm, "model", None) if lm else None
+    lens_material = getattr(lm, "material", None) if lm else None
+    lens_treatment = getattr(lm, "treatment", None) if lm else None
+    lens_idx = float(lm.refractive_index) if lm and getattr(lm, "refractive_index", None) else None
+
+    if not lens_treatment and item.treatments and item.treatments != "Incolor / Sem Tratamento":
+        lens_treatment = item.treatments
+
     # Dicionários de catálogo se DB estiver disponível
     catalog_cache: Dict[str, Dict[uuid.UUID, Any]] = {"product": {}, "service": {}, "treatment": {}}
     if db is not None and order_items:
@@ -341,7 +385,17 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
     if getattr(order, "os_type", "") != "REPARO_SERVICO" and (lens_price > 0 or not order_items):
         lens_qty = 2  # Par de lentes por padrão para cada OS de produção
         prod_items = [i for i in order_items if getattr(i, "entity_type", "") == "product"]
-        lens_desc = "Lente Oftálmica"
+        
+        # Descrição rica da lente
+        desc_parts = []
+        if lens_material:
+            desc_parts.append(lens_material)
+        if lens_idx:
+            desc_parts.append(f"{lens_idx:.2f}")
+        if lens_treatment:
+            desc_parts.append(lens_treatment)
+        lens_desc = " • ".join(desc_parts) if desc_parts else "Lente Oftálmica"
+
         if prod_items:
             sum_qty = sum(getattr(pi, "quantity", 1) for pi in prod_items)
             if sum_qty > 0:
@@ -354,7 +408,14 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
             item_type="Lente",
             quantity=lens_qty,
             unit_price=unit_p,
-            total_price=round(lens_price, 2)
+            total_price=round(lens_price, 2),
+            brand=lens_brand,
+            model=lens_model_name,
+            treatment=lens_treatment,
+            material=lens_material,
+            refractive_index=lens_idx,
+            od_prescription=od_presc,
+            oe_prescription=oe_presc
         ))
 
     # 5.2 Linhas de Serviços Técnicos

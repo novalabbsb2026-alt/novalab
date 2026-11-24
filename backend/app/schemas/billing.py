@@ -18,6 +18,13 @@ class OSItemDetail(BaseModel):
     quantity: int = 1
     unit_price: float = 0.0
     total_price: float = 0.0
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    treatment: Optional[str] = None
+    material: Optional[str] = None
+    refractive_index: Optional[float] = None
+    od_prescription: Optional[str] = None
+    oe_prescription: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,6 +44,8 @@ class BillingItemResponse(BaseModel):
     lens_price: Optional[float] = 0.0
     service_price: Optional[float] = 0.0
     treatment_price: Optional[float] = 0.0
+    od_prescription: Optional[str] = None
+    oe_prescription: Optional[str] = None
     detailed_items: List[OSItemDetail] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -81,6 +90,8 @@ class PendingOrderResponse(BaseModel):
     lens_price: Optional[float] = 0.0
     service_price: Optional[float] = 0.0
     treatment_price: Optional[float] = 0.0
+    od_prescription: Optional[str] = None
+    oe_prescription: Optional[str] = None
     detailed_items: List[OSItemDetail] = []
 
     model_config = ConfigDict(from_attributes=True)

@@ -1757,7 +1757,7 @@ const FechamentoFinanceiro = ({ laboratory, currentUser }) => {
                           background: 'rgba(15,23,42,0.03)', 
                           padding: '10px 16px', 
                           display: 'flex', 
-                          justify: 'space-between', 
+                          justifyContent: 'space-between', 
                           alignItems: 'center', 
                           borderBottom: '1px solid rgba(224,230,240,0.8)' 
                         }}>
@@ -1776,22 +1776,35 @@ const FechamentoFinanceiro = ({ laboratory, currentUser }) => {
                             <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'hsl(var(--text-primary))' }}>
                               Paciente / Cliente: <strong>{item.client_name || 'Consumidor Final'}</strong>
                             </span>
+                            {(item.od_prescription || item.oe_prescription) && (
+                              <span style={{ 
+                                fontSize: '0.74rem', 
+                                background: '#f1f5f9', 
+                                border: '1px solid #cbd5e1', 
+                                padding: '2px 8px', 
+                                borderRadius: '4px',
+                                fontFamily: 'monospace',
+                                color: '#334155'
+                              }}>
+                                👓 OD: {item.od_prescription || 'Plano'} | OE: {item.oe_prescription || 'Plano'}
+                              </span>
+                            )}
                           </div>
                           
-                          <div style={{ fontSize: '0.9rem', color: 'hsl(var(--text-secondary))' }}>
+                          <div style={{ fontSize: '0.9rem', color: 'hsl(var(--text-secondary))', whiteSpace: 'nowrap' }}>
                             Subtotal OS: <strong style={{ color: 'hsl(var(--text-primary))', fontSize: '1rem', marginLeft: '4px' }}>{formatCurrency(item.amount)}</strong>
                           </div>
                         </div>
 
-                        {/* Tabela de Itens e Serviços da OS (Layout Anexo 1) */}
+                        {/* Tabela de Itens e Serviços da OS (Layout Detalhado para Fatura) */}
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
                           <thead>
                             <tr style={{ background: 'rgba(15,23,42,0.015)', color: 'hsl(var(--text-secondary))' }}>
                               <th style={{ padding: '8px 16px', textAlign: 'left', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '30%' }}>Item / Serviço</th>
-                              <th style={{ padding: '8px 16px', textAlign: 'left', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '35%' }}>Descrição do Catálogo</th>
-                              <th style={{ padding: '8px 16px', textAlign: 'center', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '12%' }}>Tipo</th>
-                              <th style={{ padding: '8px 16px', textAlign: 'center', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '10%' }}>Qtd</th>
-                              <th style={{ padding: '8px 16px', textAlign: 'right', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '13%' }}>Valor (R$)</th>
+                              <th style={{ padding: '8px 16px', textAlign: 'left', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '38%' }}>Especificação Técnica & Tratamento</th>
+                              <th style={{ padding: '8px 16px', textAlign: 'center', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '10%' }}>Tipo</th>
+                              <th style={{ padding: '8px 16px', textAlign: 'center', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '8%' }}>Qtd</th>
+                              <th style={{ padding: '8px 16px', textAlign: 'right', borderBottom: '1px solid rgba(224,230,240,0.6)', width: '14%' }}>Valor (R$)</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1804,15 +1817,52 @@ const FechamentoFinanceiro = ({ laboratory, currentUser }) => {
                                 const typeBg = isLens ? 'rgba(147, 51, 234, 0.1)' : isService ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
                                 const typeColor = isLens ? '#7e22ce' : isService ? '#1d4ed8' : '#047857';
 
+                                const hasPrescription = detail.od_prescription || detail.oe_prescription || item.od_prescription || item.oe_prescription;
+
                                 return (
                                   <tr key={idx} style={{ borderBottom: idx === item.detailed_items.length - 1 ? 'none' : '1px solid rgba(224,230,240,0.4)' }}>
-                                    <td style={{ padding: '8px 16px', fontWeight: 600, color: 'hsl(var(--text-primary))' }}>
-                                      {detail.name}
+                                    <td style={{ padding: '8px 16px', verticalAlign: 'top' }}>
+                                      <div style={{ fontWeight: 700, color: 'hsl(var(--text-primary))' }}>
+                                        {detail.name}
+                                      </div>
+                                      {isLens && (detail.brand || detail.model) && (
+                                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                                          Marca: <strong>{detail.brand || '-'}</strong> {detail.model ? `• Modelo: ${detail.model}` : ''}
+                                        </div>
+                                      )}
                                     </td>
-                                    <td style={{ padding: '8px 16px', color: 'hsl(var(--text-secondary))' }}>
-                                      {isLens ? 'Lente Oftálmica' : (detail.description || '-')}
+                                    <td style={{ padding: '8px 16px', verticalAlign: 'top', color: 'hsl(var(--text-secondary))' }}>
+                                      {isLens ? (
+                                        <div>
+                                          <div style={{ fontWeight: 600, color: 'hsl(var(--primary))' }}>
+                                            Tratamento: <strong>{detail.treatment || item.treatments || 'Incolor / Sem Tratamento'}</strong>
+                                          </div>
+                                          {(detail.material || detail.refractive_index) && (
+                                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                                              {detail.material ? `Material: ${detail.material}` : ''} 
+                                              {detail.refractive_index ? ` • Índice: ${detail.refractive_index.toFixed(2)}` : ''}
+                                            </div>
+                                          )}
+                                          {hasPrescription && (
+                                            <div style={{ 
+                                              fontSize: '0.72rem', 
+                                              background: '#f8fafc', 
+                                              border: '1px solid #e2e8f0', 
+                                              borderRadius: '4px', 
+                                              padding: '3px 6px', 
+                                              marginTop: '4px', 
+                                              fontFamily: 'monospace', 
+                                              color: '#1e293b' 
+                                            }}>
+                                              OD: {detail.od_prescription || item.od_prescription || 'Plano'} | OE: {detail.oe_prescription || item.oe_prescription || 'Plano'}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        detail.description || '-'
+                                      )}
                                     </td>
-                                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', verticalAlign: 'top' }}>
                                       <span style={{ 
                                         display: 'inline-block',
                                         padding: '2px 8px', 
@@ -1825,10 +1875,10 @@ const FechamentoFinanceiro = ({ laboratory, currentUser }) => {
                                         {detail.item_type}
                                       </span>
                                     </td>
-                                    <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'hsl(var(--text-primary))' }}>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'hsl(var(--text-primary))', verticalAlign: 'top' }}>
                                       {detail.quantity} {isLens ? 'un' : ''}
                                     </td>
-                                    <td style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 700, color: 'hsl(var(--text-primary))' }}>
+                                    <td style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 700, color: 'hsl(var(--text-primary))', verticalAlign: 'top' }}>
                                       {formatCurrency(detail.total_price ?? (detail.unit_price * detail.quantity))}
                                     </td>
                                   </tr>

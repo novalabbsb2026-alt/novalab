@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api, { LensService, OSService, getBaseUrl, getWsUrl } from '../services/api';
 
-import { Play, Check, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Info, DollarSign, History, User, Clock, MapPin, ClipboardList, Trash2, Barcode, Camera, Keyboard, CheckCircle } from 'lucide-react';
+import { Play, Check, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Info, DollarSign, History, User, Clock, MapPin, ClipboardList, Trash2, Barcode, Camera, Keyboard, CheckCircle, PackageCheck, Zap, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import OSDetail from './OSDetail';
 
@@ -10,8 +10,26 @@ const OSWorkflow = () => {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  // Abas do Kanban da Sprint 6: Recebida, Separação, Produção, Montagem, CQ, Expedição, Cancelada
-  const [activeSubTab, setActiveSubTab] = useState('Recebida'); 
+  // Modo de Operação: 'agile' (Bancada Ágil / Operador Único) | 'multisector' (Multi-Setor Industrial)
+  const [workflowMode, setWorkflowMode] = useState(() => {
+    return localStorage.getItem('factory_workflow_mode') || 'agile';
+  });
+
+  // Abas do Kanban (No modo ágil: 'Em Produção', 'Concluída', 'Cancelada')
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const savedMode = localStorage.getItem('factory_workflow_mode') || 'agile';
+    return savedMode === 'agile' ? 'Em Produção' : 'Recebida';
+  }); 
+
+  // Modal Rápido de Registro de Quebra / Scrap
+  const [breakageModal, setBreakageModal] = useState({
+    isOpen: false,
+    os: null,
+    eye: 'AMBOS',
+    reason: 'Quebra no Facetamento / Corte',
+    customReason: '',
+    submitting: false
+  }); 
   
   // Controle de acordes / formulário de alocação por OS
   const [expandedOsId, setExpandedOsId] = useState(null);
@@ -67,6 +85,56 @@ const OSWorkflow = () => {
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.detail || "Falha ao cancelar a Ordem de Serviço.");
+    }
+  };
+
+  // Funções da Bancada Ágil (Operador Único)
+  const handleOpenBreakageModal = (os) => {
+    setBreakageModal({
+      isOpen: true,
+      os: os,
+      eye: 'AMBOS',
+      reason: 'Quebra no Facetamento / Corte',
+      customReason: '',
+      submitting: false
+    });
+  };
+
+  const handleConfirmBreakage = async () => {
+    if (!breakageModal.os) return;
+    const finalReason = breakageModal.reason === 'Outro'
+      ? (breakageModal.customReason || 'Avaria física na bancada')
+      : `${breakageModal.reason} (Olho: ${breakageModal.eye})`;
+
+    setBreakageModal(prev => ({ ...prev, submitting: true }));
+    try {
+      await api.post(`/factory/os/${breakageModal.os.id}/breakage`, {
+        operator_notes: finalReason
+      });
+      setBreakageModal({ isOpen: false, os: null, eye: 'AMBOS', reason: '', customReason: '', submitting: false });
+      loadOrders();
+      alert(`Quebra registrada para a OS ${breakageModal.os.os_number}. A lente danificada foi descartada do estoque físico e a OS está pronta para alocar a nova lente.`);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Erro ao registrar quebra.");
+      setBreakageModal(prev => ({ ...prev, submitting: false }));
+    }
+  };
+
+  const handleQuickCompleteOS = async (os) => {
+    if (!window.confirm(`Deseja concluir a OS ${os.os_number} e liberar para entrega e fechamento financeiro?`)) {
+      return;
+    }
+    try {
+      await api.post(`/os/${os.id}/status`, {
+        status: 'Concluída',
+        operator_notes: 'OS concluída com sucesso na bancada única.',
+        sector: 'Bancada Ágil'
+      });
+      loadOrders();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.detail || "Falha ao concluir a OS.");
     }
   };
 
@@ -462,18 +530,75 @@ const OSWorkflow = () => {
           <p style={{ fontSize: '0.85rem' }}>Workflow operacional do laboratório oftálmico. Acompanhe a rastreabilidade e transições de chão de fábrica.</p>
         </div>
 
-        {/* Abas das Bancadas do Kanban (Sprint 6) */}
-        <div className="nav-tabs" style={{ marginLeft: 'auto', display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-          {['Recebida', 'Separação', 'Produção', 'Montagem', 'CQ', 'Expedição', 'Concluída', 'Cancelada'].map(tab => (
-            <button 
-              key={tab}
-              className={`tab-btn ${activeSubTab === tab ? 'active' : ''}`} 
-              onClick={() => { setActiveSubTab(tab); setExpandedOsId(null); setExpandedHistoryId(null); }}
-              style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-            >
-              {tab === 'Recebida' ? 'Recebidas (Triagem)' : tab === 'CQ' ? 'CQ (Qualidade)' : tab === 'Expedição' ? 'Expedição (Logística)' : tab === 'Concluída' ? 'Concluídas / Entregues' : tab}
-            </button>
-          ))}
+        {/* Toggle de Modo Operacional e Abas */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => {
+              const nextMode = workflowMode === 'agile' ? 'multisector' : 'agile';
+              setWorkflowMode(nextMode);
+              localStorage.setItem('factory_workflow_mode', nextMode);
+              setActiveSubTab(nextMode === 'agile' ? 'Em Produção' : 'Recebida');
+              setExpandedOsId(null);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              padding: '6px 12px',
+              borderColor: workflowMode === 'agile' ? '#059669' : 'rgba(255,255,255,0.2)',
+              color: workflowMode === 'agile' ? '#34d399' : 'hsl(var(--text-muted))',
+              background: workflowMode === 'agile' ? 'rgba(5, 150, 105, 0.12)' : 'transparent'
+            }}
+            title="Alternar entre visualização simplificada de 1 operador e industrial completa"
+          >
+            <Zap size={14} />
+            {workflowMode === 'agile' ? 'Modo Ágil (Operador Único)' : 'Modo Multi-Setor Industrial'}
+          </button>
+
+          {/* Abas das Bancadas do Kanban */}
+          <div className="nav-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+            {workflowMode === 'agile' ? (
+              <>
+                <button 
+                  className={`tab-btn ${activeSubTab === 'Em Produção' ? 'active' : ''}`} 
+                  onClick={() => { setActiveSubTab('Em Produção'); setExpandedOsId(null); setExpandedHistoryId(null); }}
+                  style={{ fontSize: '0.82rem', padding: '6px 14px', fontWeight: activeSubTab === 'Em Produção' ? 800 : 500 }}
+                >
+                  ⚙️ Em Produção (Bancada Única)
+                </button>
+                <button 
+                  className={`tab-btn ${activeSubTab === 'Concluída' ? 'active' : ''}`} 
+                  onClick={() => { setActiveSubTab('Concluída'); setExpandedOsId(null); setExpandedHistoryId(null); }}
+                  style={{ fontSize: '0.82rem', padding: '6px 14px', fontWeight: activeSubTab === 'Concluída' ? 800 : 500 }}
+                >
+                  ✅ Concluídas / Prontas
+                </button>
+                <button 
+                  className={`tab-btn ${activeSubTab === 'Cancelada' ? 'active' : ''}`} 
+                  onClick={() => { setActiveSubTab('Cancelada'); setExpandedOsId(null); setExpandedHistoryId(null); }}
+                  style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+                >
+                  ❌ Canceladas
+                </button>
+              </>
+            ) : (
+              ['Recebida', 'Separação', 'Produção', 'Montagem', 'CQ', 'Expedição', 'Concluída', 'Cancelada'].map(tab => (
+                <button 
+                  key={tab}
+                  className={`tab-btn ${activeSubTab === tab ? 'active' : ''}`} 
+                  onClick={() => { setActiveSubTab(tab); setExpandedOsId(null); setExpandedHistoryId(null); }}
+                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                >
+                  {tab === 'Recebida' ? 'Recebidas (Triagem)' : tab === 'CQ' ? 'CQ (Qualidade)' : tab === 'Expedição' ? 'Expedição (Logística)' : tab === 'Concluída' ? 'Concluídas / Entregues' : tab}
+                </button>
+              ))
+            )}
+          </div>
         </div>
 
         {/* Botão de escaneamento de OS de bancada */}
@@ -615,81 +740,159 @@ const OSWorkflow = () => {
                       </button>
                     )}
 
-                    {os.status === 'Recebida' && (
-                      os.os_type === 'REPARO_SERVICO' ? (
+                    {/* CONTROLES DA BANCADA ÁGIL (OPERADOR ÚNICO) */}
+                    {workflowMode === 'agile' && os.status !== 'Concluída' && os.status !== 'Cancelada' && (
+                      <>
+                        {/* Baixa de Lente / Alocação */}
+                        {(!os.od_lens_inventory_id || !os.oe_lens_inventory_id) && os.os_type !== 'REPARO_SERVICO' ? (
+                          <button 
+                            className="btn btn-warning btn-sm" 
+                            onClick={() => {
+                              toggleExpand(os);
+                              setExpandedDetailsId(null);
+                            }} 
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)', fontWeight: 700 }}
+                          >
+                            <PackageCheck size={14} />
+                            {isExpanded ? "Fechar Alocação" : "Alocar & Baixar Lente"}
+                          </button>
+                        ) : (
+                          <span style={{ 
+                            fontSize: '0.74rem', 
+                            background: 'rgba(16, 185, 129, 0.12)', 
+                            color: '#10b981', 
+                            border: '1px solid rgba(16, 185, 129, 0.3)', 
+                            padding: '4px 10px', 
+                            borderRadius: '6px', 
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <CheckCircle size={13} /> Lentes Baixadas
+                          </span>
+                        )}
+
+                        {/* Botão Direto de Conclusão de OS */}
                         <button 
                           className="btn btn-primary btn-sm" 
-                          onClick={() => handleStatusTransition(os.id, 'Montagem', 'OS de Reparo/Serviço encaminhada para a bancada técnica.', 'Serviço Técnico / Reparos')} 
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#2563eb', borderColor: '#1d4ed8' }}
+                          onClick={() => handleQuickCompleteOS(os)}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px', 
+                            background: '#059669', 
+                            borderColor: '#047857', 
+                            color: '#ffffff',
+                            fontWeight: 800,
+                            padding: '6px 14px',
+                            boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
+                          }}
+                          title="Conclui a OS diretamente na bancada e libera para Fechamento Financeiro"
                         >
-                          <Play size={14} /> Encaminhar p/ Bancada Técnica
+                          <Check size={15} strokeWidth={2.5} /> Concluir OS
                         </button>
-                      ) : (
-                        <button className="btn btn-secondary btn-sm" onClick={() => {
-                          toggleExpand(os);
-                          setExpandedDetailsId(null);
-                        }} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          {isExpanded ? "Fechar Alocação" : "Validar & Alocar"}
+
+                        {/* Botão Rápido de Quebra / Scrap */}
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          onClick={() => handleOpenBreakageModal(os)}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '5px', 
+                            borderColor: 'rgba(239, 68, 68, 0.4)', 
+                            color: '#ef4444', 
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            fontWeight: 700,
+                            padding: '6px 12px'
+                          }}
+                          title="Registrar quebra de lente, descartar refugo do estoque e liberar nova alocação"
+                        >
+                          <AlertTriangle size={14} /> Registrar Quebra
                         </button>
-                      )
+                      </>
                     )}
 
-                    {os.status === 'Separação' && (
-                      <button className="btn btn-primary btn-sm" onClick={() => handleStatusTransition(os.id, 'Produção', 'Separação física concluída no estoque.', 'Almoxarifado / Separação')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Play size={14} /> Confirmar Separação
-                      </button>
-                    )}
+                    {/* CONTROLES TRADICIONAIS (MODO MULTI-SETOR INDUSTRIAL) */}
+                    {workflowMode === 'multisector' && (
+                      <>
+                        {os.status === 'Recebida' && (
+                          os.os_type === 'REPARO_SERVICO' ? (
+                            <button 
+                              className="btn btn-primary btn-sm" 
+                              onClick={() => handleStatusTransition(os.id, 'Montagem', 'OS de Reparo/Serviço encaminhada para a bancada técnica.', 'Serviço Técnico / Reparos')} 
+                              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#2563eb', borderColor: '#1d4ed8' }}
+                            >
+                              <Play size={14} /> Encaminhar p/ Bancada Técnica
+                            </button>
+                          ) : (
+                            <button className="btn btn-secondary btn-sm" onClick={() => {
+                              toggleExpand(os);
+                              setExpandedDetailsId(null);
+                            }} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              {isExpanded ? "Fechar Alocação" : "Validar & Alocar"}
+                            </button>
+                          )
+                        )}
 
-                    {['Produção', 'Surfaçagem'].includes(os.status) && (
-                      <button className="btn btn-primary btn-sm" onClick={() => handleStatusTransition(os.id, 'Montagem', 'Processo de surfaçagem finalizado.', 'Surfaçagem / Produção')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Play size={14} /> Iniciar Montagem
-                      </button>
-                    )}
+                        {os.status === 'Separação' && (
+                          <button className="btn btn-primary btn-sm" onClick={() => handleStatusTransition(os.id, 'Produção', 'Separação física concluída no estoque.', 'Almoxarifado / Separação')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Play size={14} /> Confirmar Separação
+                          </button>
+                        )}
 
-                    {os.status === 'Montagem' && (
-                      <button className="btn btn-accent btn-sm" onClick={() => handleStatusTransition(os.id, 'CQ', 'Lentes facetadas e montadas no aro.', 'Corte & Montagem')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Check size={14} /> Enviar para CQ
-                      </button>
-                    )}
+                        {['Produção', 'Surfaçagem'].includes(os.status) && (
+                          <button className="btn btn-primary btn-sm" onClick={() => handleStatusTransition(os.id, 'Montagem', 'Processo de surfaçagem finalizado.', 'Surfaçagem / Produção')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Play size={14} /> Iniciar Montagem
+                          </button>
+                        )}
 
-                    {['CQ', 'CQ Final'].includes(os.status) && (
-                      <button 
-                        className={`btn btn-sm ${showingCQForm[os.id] ? 'btn-primary' : 'btn-accent'}`} 
-                        onClick={() => {
-                          const willShow = !showingCQForm[os.id];
-                          setShowingCQForm(prev => ({ ...prev, [os.id]: willShow }));
-                          if (willShow) initCQForm(os.id);
-                        }} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <ClipboardList size={14} /> {showingCQForm[os.id] ? "Fechar Inspeção" : "Inspeção de CQ"}
-                      </button>
-                    )}
+                        {os.status === 'Montagem' && (
+                          <button className="btn btn-accent btn-sm" onClick={() => handleStatusTransition(os.id, 'CQ', 'Lentes facetadas e montadas no aro.', 'Corte & Montagem')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Check size={14} /> Enviar para CQ
+                          </button>
+                        )}
 
-                    {['Expedição', 'EXPEDICAO'].includes(os.status) && (
-                      <button 
-                        className="btn btn-primary btn-sm" 
-                        onClick={() => {
-                          handleStatusTransition(os.id, 'Concluída', 'Pacote finalizado e expedido com sucesso.', 'Expedição & Logística');
-                          alert(`OS ${os.os_number} expedida e concluída com sucesso! Ela foi movida para a aba de Concluídas/Entregues e disponibilizada no Fechamento Financeiro.`);
-                        }} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}
-                      >
-                        <Check size={14} /> Concluir & Despachar OS
-                      </button>
-                    )}
+                        {['CQ', 'CQ Final'].includes(os.status) && (
+                          <button 
+                            className={`btn btn-sm ${showingCQForm[os.id] ? 'btn-primary' : 'btn-accent'}`} 
+                            onClick={() => {
+                              const willShow = !showingCQForm[os.id];
+                              setShowingCQForm(prev => ({ ...prev, [os.id]: willShow }));
+                              if (willShow) initCQForm(os.id);
+                            }} 
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <ClipboardList size={14} /> {showingCQForm[os.id] ? "Fechar Inspeção" : "Inspeção de CQ"}
+                          </button>
+                        )}
 
+                        {['Expedição', 'EXPEDICAO'].includes(os.status) && (
+                          <button 
+                            className="btn btn-primary btn-sm" 
+                            onClick={() => {
+                              handleStatusTransition(os.id, 'Concluída', 'Pacote finalizado e expedido com sucesso.', 'Expedição & Logística');
+                              alert(`OS ${os.os_number} expedida e concluída com sucesso! Ela foi movida para a aba de Concluídas/Entregues e disponibilizada no Fechamento Financeiro.`);
+                            }} 
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}
+                          >
+                            <Check size={14} /> Concluir & Despachar OS
+                          </button>
+                        )}
 
-                    {/* Botão de Quebra Física em Chão de Fábrica */}
-                    {['Separação', 'Produção', 'Surfaçagem', 'Montagem', 'CQ', 'CQ Final'].includes(os.status) && (
-                      <button 
-                        className="btn btn-secondary btn-sm" 
-                        style={{ borderColor: 'hsl(var(--danger) / 0.3)', color: 'hsl(var(--danger))' }}
-                        onClick={() => setShowingQuebraInput(prev => ({ ...prev, [os.id]: !prev[os.id] }))}
-                      >
-                        <AlertTriangle size={14} /> Interromper (Scrap)
-                      </button>
+                        {/* Botão de Quebra Física em Chão de Fábrica */}
+                        {['Separação', 'Produção', 'Surfaçagem', 'Montagem', 'CQ', 'CQ Final'].includes(os.status) && (
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            style={{ borderColor: 'hsl(var(--danger) / 0.3)', color: 'hsl(var(--danger))' }}
+                            onClick={() => setShowingQuebraInput(prev => ({ ...prev, [os.id]: !prev[os.id] }))}
+                          >
+                            <AlertTriangle size={14} /> Interromper (Scrap)
+                          </button>
+                        )}
+                      </>
                     )}
 
                   </div>
@@ -1245,6 +1448,133 @@ const OSWorkflow = () => {
                 }}
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Rápido de Registro de Quebra / Scrap da Bancada Ágil */}
+      {breakageModal.isOpen && breakageModal.os && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '520px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444' }}>
+                <AlertTriangle size={20} /> Registrar Quebra / Perda de Lente
+              </h3>
+              <button 
+                className="btn btn-icon" 
+                onClick={() => setBreakageModal({ isOpen: false, os: null, eye: 'AMBOS', reason: '', customReason: '', submitting: false })}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--border-glass)' }}>
+                <div style={{ fontSize: '0.8rem', color: 'hsl(var(--text-muted))' }}>Ordem de Serviço</div>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ffffff' }}>
+                  {breakageModal.os.os_number} — <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'hsl(var(--text-secondary))' }}>{breakageModal.os.client_name || 'Consumidor Final'}</span>
+                </div>
+              </div>
+
+              {/* Seleção do Olho Afetado */}
+              <div style={{ marginBottom: '14px' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: '6px', display: 'block' }}>
+                  Qual lente sofreu a quebra / avaria?
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {[
+                    { id: 'OD', label: 'Olho Direito (OD)' },
+                    { id: 'OE', label: 'Olho Esquerdo (OE)' },
+                    { id: 'AMBOS', label: 'Ambos os Olhos' }
+                  ].map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`btn btn-sm ${breakageModal.eye === item.id ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '8px', fontSize: '0.78rem', fontWeight: 700 }}
+                      onClick={() => setBreakageModal(prev => ({ ...prev, eye: item.id }))}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Motivo da Quebra */}
+              <div style={{ marginBottom: '14px' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: '6px', display: 'block' }}>
+                  Motivo da Quebra / Refugo:
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {[
+                    'Quebra no Facetamento / Corte',
+                    'Trincou / Lascou na Montagem',
+                    'Eixo fora de especificação (> 3°)',
+                    'Erro de Grau / Dioptria',
+                    'Avaria no Tratamento Antirreflexo',
+                    'Outro'
+                  ].map(r => (
+                    <label 
+                      key={r} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        fontSize: '0.82rem', 
+                        cursor: 'pointer',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        background: breakageModal.reason === r ? 'rgba(239, 68, 68, 0.12)' : 'transparent',
+                        border: breakageModal.reason === r ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid transparent'
+                      }}
+                    >
+                      <input 
+                        type="radio" 
+                        name="breakage_reason" 
+                        checked={breakageModal.reason === r} 
+                        onChange={() => setBreakageModal(prev => ({ ...prev, reason: r }))} 
+                      />
+                      <span>{r}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {breakageModal.reason === 'Outro' && (
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Descreva o motivo da avaria..."
+                    value={breakageModal.customReason}
+                    onChange={(e) => setBreakageModal(prev => ({ ...prev, customReason: e.target.value }))}
+                    style={{ marginTop: '8px', color: 'black' }}
+                  />
+                )}
+              </div>
+
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '10px 12px', borderRadius: '6px', fontSize: '0.78rem', color: '#fca5a5' }}>
+                ℹ️ As lentes danificadas serão descartadas do estoque físico, o custo de perda será registrado nos relatórios de retrabalho e a OS será liberada para alocar a lente substituta.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setBreakageModal({ isOpen: false, os: null, eye: 'AMBOS', reason: '', customReason: '', submitting: false })}
+                disabled={breakageModal.submitting}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ background: '#dc2626', borderColor: '#b91c1c', fontWeight: 800 }}
+                onClick={handleConfirmBreakage}
+                disabled={breakageModal.submitting}
+              >
+                {breakageModal.submitting ? 'Registrando...' : 'Confirmar Quebra & Descartar'}
               </button>
             </div>
           </div>
