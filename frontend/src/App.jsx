@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Grid, FileUp, ShieldAlert, Smartphone, FileText, Activity, BarChart2, Store, Key, Layers, DollarSign, Percent, Keyboard } from 'lucide-react';
+import { Grid, FileUp, ShieldAlert, Smartphone, FileText, Activity, BarChart2, Store, Key, Layers, DollarSign, Percent, Keyboard, Bell } from 'lucide-react';
 import UsbScanner from './components/UsbScanner';
 import GradeOptica from './components/GradeOptica';
 import GradeBlocos from './components/GradeBlocos';
@@ -119,6 +119,40 @@ function App() {
 
   const [showTenantModal, setShowTenantModal] = useState(false);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
+
+  // Estados de Comunicados Globais (Broadcasts) entregues pelo SuperAdmin aos laboratórios
+  const [activeBroadcasts, setActiveBroadcasts] = useState([]);
+  const [dismissedBroadcastIds, setDismissedBroadcastIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dismissed_broadcasts') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchBroadcasts = async () => {
+      try {
+        const res = await api.get('/tenants/broadcasts');
+        const list = res.data || [];
+        setActiveBroadcasts(list.filter(b => b.is_active));
+      } catch (err) {
+        // Silencioso se não houver ou erro
+      }
+    };
+    fetchBroadcasts();
+    const interval = setInterval(fetchBroadcasts, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const handleDismissBroadcast = (id) => {
+    setDismissedBroadcastIds(prev => {
+      const updated = [...prev, id];
+      localStorage.setItem('dismissed_broadcasts', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   useEffect(() => {
     if (currentUser && currentUser.role === 'Administrador') {
@@ -813,6 +847,54 @@ function App() {
         </div>
       </header>
       )}
+
+      {/* Banner de Comunicados Globais / Avisos Disparados aos Clientes */}
+      {activeTab !== 'painel-laboratorios' && activeBroadcasts
+        .filter(b => !dismissedBroadcastIds.includes(b.id))
+        .map(b => (
+          <div 
+            key={b.id}
+            style={{
+              background: b.type === 'urgent' ? 'linear-gradient(90deg, #fef2f2, #fee2e2)' : b.type === 'warning' ? 'linear-gradient(90deg, #fffbeb, #fef3c7)' : 'linear-gradient(90deg, #eff6ff, #dbeafe)',
+              borderBottom: `1px solid ${b.type === 'urgent' ? '#fca5a5' : b.type === 'warning' ? '#fcd34d' : '#bfdbfe'}`,
+              padding: '12px 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              color: b.type === 'urgent' ? '#991b1b' : b.type === 'warning' ? '#92400e' : '#1e40af',
+              fontSize: '0.88rem',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+              zIndex: 90
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Bell size={18} style={{ color: b.type === 'urgent' ? '#dc2626' : b.type === 'warning' ? '#d97706' : '#2563eb', flexShrink: 0 }} />
+              <div>
+                <strong style={{ fontWeight: 800 }}>{b.title}:</strong>{' '}
+                <span style={{ fontWeight: 500 }}>{b.message}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDismissBroadcast(b.id)}
+              style={{
+                background: 'rgba(0,0,0,0.07)',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '5px 12px',
+                color: 'inherit',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+              title="Dispensar aviso"
+            >
+              Entendido ✕
+            </button>
+          </div>
+        ))}
 
       {/* Barra de Pesquisa Rápida Mobile */}
       {activeTab !== 'painel-laboratorios' && (

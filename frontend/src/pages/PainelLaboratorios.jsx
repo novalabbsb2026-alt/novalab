@@ -497,14 +497,17 @@ export default function PainelLaboratorios({
   const handleUpdateTicketStatus = async (ticketId, newStatus) => {
     try {
       const token = localStorage.getItem('factory_token');
+      // Atualização otimista imediata na interface
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
       await axios.put(
         `${getBaseUrl()}/tenants/support/tickets/${ticketId}`,
-        { status_val: newStatus },
+        { status_val: newStatus, status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await loadTickets();
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao atualizar status do ticket:", err);
+      await loadTickets();
     }
   };
 
@@ -2063,34 +2066,112 @@ export default function PainelLaboratorios({
                       <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Data / Hora</th>
                       <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Autor / Usuário</th>
                       <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Ação</th>
-                      <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Tabela</th>
+                      <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Módulo</th>
                       <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>IP</th>
-                      <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Detalhes</th>
+                      <th style={{ padding: '10px 14px', color: T.textSecondary, fontWeight: 700 }}>Resumo da Atividade</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {auditLogs.map(log => (
-                      <tr key={log.id} style={{ borderBottom: `1px solid ${T.border}` }}>
-                        <td style={{ padding: '10px 14px', color: T.textLight, whiteSpace: 'nowrap' }}>{log.created_at}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: T.textPrimary }}>{log.user_name}</td>
-                        <td style={{ padding: '10px 14px' }}>
-                          <span style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            backgroundColor: log.action.includes('LOGIN') ? T.emeraldBg : (log.action.includes('SECURITY') ? T.goldBg : T.bg),
-                            color: log.action.includes('LOGIN') ? T.emerald : (log.action.includes('SECURITY') ? T.goldDark : T.textSecondary),
-                            border: `1px solid ${T.border}`
-                          }}>
-                            {log.action}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: T.textSecondary }}>{log.table_name}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: T.textLight }}>{log.ip_address || '—'}</td>
-                        <td style={{ padding: '10px 14px', color: T.textSecondary }}>{log.details || log.new_values || 'Registro gravado'}</td>
-                      </tr>
-                    ))}
+                    {auditLogs.map(log => {
+                      const tableLabels = {
+                        'accounts_receivable': 'Financeiro (Contas a Receber)',
+                        'billing_cycles': 'Fechamento de Faturas',
+                        'billing_items': 'Itens Faturados',
+                        'os_workflow_history': 'Bancada de Produção (OS)',
+                        'service_orders': 'Ordem de Serviço (OS)',
+                        'tenants': 'Laboratório (Assinatura)',
+                        'users': 'Usuários & Permissões',
+                        'optical_stores': 'Óticas Parceiras',
+                        'lens_models': 'Catálogo de Lentes',
+                        'lens_inventory_grade': 'Estoque de Dioptrias'
+                      };
+
+                      const actionLabels = {
+                        'CREATE': 'Novo Registro',
+                        'UPDATE': 'Alteração',
+                        'DELETE': 'Exclusão',
+                        'LOGIN_SUPERADMIN': 'Login Master',
+                        'CONFIG_UPDATE': 'Configuração',
+                        'SECURITY_CHECK': 'Verificação'
+                      };
+
+                      let cleanDetails = log.details;
+                      let rawJson = null;
+
+                      try {
+                        const raw = log.new_values || log.details;
+                        if (raw && typeof raw === 'string' && (raw.trim().startsWith('{') || raw.trim().startsWith('['))) {
+                          rawJson = JSON.parse(raw);
+                        } else if (raw && typeof raw === 'object') {
+                          rawJson = raw;
+                        }
+
+                        if (rawJson) {
+                          if (log.table_name === 'accounts_receivable') {
+                            const desc = rawJson.description || 'Cobrança de fechamento';
+                            const val = rawJson.amount ? `R$ ${parseFloat(rawJson.amount).toFixed(2)}` : '';
+                            const due = rawJson.due_date ? `(Vencimento: ${rawJson.due_date.slice(0, 10).split('-').reverse().join('/')})` : '';
+                            cleanDetails = `${desc} ${val ? `— Valor: ${val}` : ''} ${due}`.trim();
+                          } else if (log.table_name === 'billing_cycles') {
+                            const total = rawJson.total_amount ? `R$ ${parseFloat(rawJson.total_amount).toFixed(2)}` : '';
+                            cleanDetails = `Fechamento de faturas gerado ${total ? `no total de ${total}` : ''}`.trim();
+                          } else if (log.table_name === 'billing_items') {
+                            const amt = rawJson.amount ? `R$ ${parseFloat(rawJson.amount).toFixed(2)}` : '';
+                            cleanDetails = `Item lançado na fatura ${amt ? `— Valor: ${amt}` : ''}`.trim();
+                          } else if (log.table_name === 'os_workflow_history') {
+                            const st = rawJson.new_status ? `"${rawJson.new_status}"` : '';
+                            const notes = rawJson.operator_notes ? `— Obs: ${rawJson.operator_notes}` : '';
+                            cleanDetails = `Etapa da OS atualizada para ${st} ${notes}`.trim();
+                          } else if (log.table_name === 'service_orders') {
+                            cleanDetails = rawJson.status ? `Status da OS atualizado para "${rawJson.status}"` : 'Dados da Ordem de Serviço atualizados';
+                          } else if (log.table_name === 'tenants') {
+                            if (rawJson.plan_tier) cleanDetails = `Plano de assinatura do laboratório definido para "${rawJson.plan_tier.toUpperCase()}"`;
+                            else if (rawJson.name) cleanDetails = `Cadastro do laboratório "${rawJson.name}" atualizado`;
+                          }
+                        }
+                      } catch (err) {
+                        // mantém original
+                      }
+
+                      const moduleName = tableLabels[log.table_name] || log.table_name;
+                      const actionName = actionLabels[log.action] || log.action;
+                      const detailsText = cleanDetails || log.details || log.new_values || 'Ação registrada no sistema';
+
+                      return (
+                        <tr key={log.id} style={{ borderBottom: `1px solid ${T.border}` }}>
+                          <td style={{ padding: '10px 14px', color: T.textLight, whiteSpace: 'nowrap' }}>{log.created_at}</td>
+                          <td style={{ padding: '10px 14px', fontWeight: 700, color: T.textPrimary }}>{log.user_name}</td>
+                          <td style={{ padding: '10px 14px' }}>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: log.action === 'CREATE' ? T.emeraldBg : log.action === 'UPDATE' ? 'rgba(37, 99, 235, 0.1)' : log.action.includes('LOGIN') ? T.emeraldBg : T.bg,
+                              color: log.action === 'CREATE' ? T.emerald : log.action === 'UPDATE' ? '#2563eb' : log.action.includes('LOGIN') ? T.emerald : T.textSecondary,
+                              border: `1px solid ${T.border}`
+                            }}>
+                              {actionName}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px', fontWeight: 600, color: T.textPrimary }}>
+                            {moduleName}
+                          </td>
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: T.textLight }}>{log.ip_address || '—'}</td>
+                          <td style={{ padding: '10px 14px', color: T.textPrimary, lineHeight: 1.4 }}>
+                            <div>{detailsText}</div>
+                            {rawJson && (
+                              <details style={{ marginTop: '4px', fontSize: '0.72rem', color: T.textMuted }}>
+                                <summary style={{ cursor: 'pointer', outline: 'none' }}>Ver dados técnicos do banco</summary>
+                                <pre style={{ margin: '4px 0 0 0', padding: '6px', background: '#f8fafc', borderRadius: '4px', fontSize: '0.68rem', fontFamily: 'monospace', overflowX: 'auto', border: `1px solid ${T.border}` }}>
+                                  {JSON.stringify(rawJson, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

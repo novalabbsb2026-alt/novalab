@@ -488,51 +488,56 @@ async def list_support_tickets(
     Lista todos os chamados de suporte abertos pelos laboratórios.
     """
     try:
+        # Garante que a tabela support_tickets exista
+        await db.execute(text("""
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id VARCHAR(64) PRIMARY KEY,
+            tenant_id VARCHAR(64),
+            tenant_name VARCHAR(150),
+            subject VARCHAR(200) NOT NULL,
+            description TEXT NOT NULL,
+            priority VARCHAR(30) DEFAULT 'MEDIA' NOT NULL,
+            status VARCHAR(30) DEFAULT 'ABERTO' NOT NULL,
+            assigned_to VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """))
+        await db.commit()
+
         res = await db.execute(text("SELECT id, tenant_id, tenant_name, subject, description, priority, status, assigned_to, created_at FROM support_tickets ORDER BY created_at DESC;"))
         rows = res.fetchall()
-        if rows:
-            return [
-                {
-                    "id": str(r[0]),
-                    "tenant_id": str(r[1]) if r[1] else None,
-                    "tenant_name": r[2] or "Laboratório Geral",
-                    "subject": r[3],
-                    "description": r[4],
-                    "priority": r[5],
-                    "status": r[6],
-                    "assigned_to": r[7] or "Suporte Técnico",
-                    "created_at": str(r[8])[:16]
-                }
-                for r in rows
-            ]
-    except Exception:
-        pass
+        if not rows:
+            # Seed tickets iniciais persistidos no banco
+            await db.execute(text("""
+                INSERT INTO support_tickets (id, tenant_id, tenant_name, subject, description, priority, status, assigned_to)
+                VALUES 
+                ('ticket-101', :tid, 'Nova LAB Matriz', 'Dúvida sobre alocação de blocos na máquina CNC', 'Operador reportou diferença de 0.25 no diâmetro efetivo ao calcular curva tórica.', 'ALTA', 'EM_ANDAMENTO', 'Raphael (Suporte Especialista)'),
+                ('ticket-102', :tid, 'Nova LAB Matriz', 'Configuração de certificado digital A1 para NF-e', 'Necessário atualizar o arquivo .pfx para renovação anual do CNPJ.', 'MEDIA', 'ABERTO', 'Fila de Atendimento')
+                ON CONFLICT (id) DO NOTHING;
+            """), {"tid": str(DEFAULT_TENANT_ID)})
+            await db.commit()
 
-    # Tickets de exemplo representativos
-    return [
-        {
-            "id": "ticket-101",
-            "tenant_id": str(DEFAULT_TENANT_ID),
-            "tenant_name": "Nova LAB Matriz",
-            "subject": "Dúvida sobre alocação de blocos na máquina CNC",
-            "description": "Operador reportou diferença de 0.25 no diâmetro efetivo ao calcular curva tórica.",
-            "priority": "ALTA",
-            "status": "EM_ANDAMENTO",
-            "assigned_to": "Raphael (Suporte Especialista)",
-            "created_at": "11/11/2026 09:15"
-        },
-        {
-            "id": "ticket-102",
-            "tenant_id": str(DEFAULT_TENANT_ID),
-            "tenant_name": "Nova LAB Matriz",
-            "subject": "Configuração de certificado digital A1 para NF-e",
-            "description": "Necessário atualizar o arquivo .pfx para renovação anual do CNPJ.",
-            "priority": "MEDIA",
-            "status": "ABERTO",
-            "assigned_to": "Fila de Atendimento",
-            "created_at": "10/11/2026 16:40"
-        }
-    ]
+            res = await db.execute(text("SELECT id, tenant_id, tenant_name, subject, description, priority, status, assigned_to, created_at FROM support_tickets ORDER BY created_at DESC;"))
+            rows = res.fetchall()
+
+        return [
+            {
+                "id": str(r[0]),
+                "tenant_id": str(r[1]) if r[1] else None,
+                "tenant_name": r[2] or "Laboratório Geral",
+                "subject": r[3],
+                "description": r[4],
+                "priority": r[5],
+                "status": r[6],
+                "assigned_to": r[7] or "Suporte Técnico",
+                "created_at": str(r[8])[:16]
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[ERRO TICKETS] {e}")
+        return []
 
 @router.post("/support/tickets")
 async def create_support_ticket(
@@ -543,7 +548,7 @@ async def create_support_ticket(
     """
     Abre um novo chamado de suporte diretamente pelo painel.
     """
-    new_id = uuid.uuid4()
+    new_id = f"ticket-{uuid.uuid4().hex[:8]}"
     tenant_name = payload.get("tenant_name", "Geral")
     subject = payload.get("subject", "").strip()
     description = payload.get("description", "").strip()
@@ -553,16 +558,23 @@ async def create_support_ticket(
         raise HTTPException(status_code=400, detail="Assunto e Descrição do chamado são obrigatórios.")
 
     try:
-        await db.execute(text(f"""
+        await db.execute(text("""
         INSERT INTO support_tickets (id, tenant_name, subject, description, priority, status, assigned_to)
-        VALUES ('{new_id}', '{tenant_name}', '{subject}', '{description}', '{priority}', 'ABERTO', '{superadmin.name or "SuperAdmin"}');
-        """))
+        VALUES (:id, :tname, :subj, :desc, :prio, 'ABERTO', :assign);
+        """), {
+            "id": new_id,
+            "tname": tenant_name,
+            "subj": subject,
+            "desc": description,
+            "prio": priority,
+            "assign": superadmin.name or "SuperAdmin"
+        })
         await db.commit()
     except Exception as e:
         print(f"[ERRO TICKET] {e}")
 
     return {
-        "id": str(new_id),
+        "id": new_id,
         "tenant_name": tenant_name,
         "subject": subject,
         "priority": priority,
@@ -573,22 +585,20 @@ async def create_support_ticket(
 @router.put("/support/tickets/{ticket_id}")
 async def update_support_ticket_status(
     ticket_id: str,
-    status_val: str = Body(..., embed=True),
+    payload: Dict[str, Any] = Body(...),
     db: AsyncSession = Depends(get_db),
     superadmin: User = Depends(get_current_superadmin)
 ):
     """
-    Atualiza o status de um chamado (ABERTO, EM_ANDAMENTO, RESOLVIDO).
+    Atualiza o status de um chamado (ABERTO, EM_ANDAMENTO, RESOLVIDO, CANCELADO).
     """
+    status_val = payload.get("status_val") or payload.get("status") or "EM_ANDAMENTO"
     try:
-        await db.execute(text(f"""
-        UPDATE support_tickets 
-        SET status = '{status_val}', updated_at = CURRENT_TIMESTAMP
-        WHERE id = '{ticket_id}';
-        """))
+        stmt = text("UPDATE support_tickets SET status = :st, updated_at = CURRENT_TIMESTAMP WHERE id = :tid")
+        await db.execute(stmt, {"st": status_val, "tid": str(ticket_id)})
         await db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ERRO UPDATE TICKET] {e}")
     return {"status": "success", "ticket_id": ticket_id, "new_status": status_val}
 
 # --- 12. Broadcasts / Avisos no App ---
