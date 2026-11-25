@@ -23,6 +23,7 @@ class OSItemDetail(BaseModel):
     treatment: Optional[str] = None
     material: Optional[str] = None
     refractive_index: Optional[float] = None
+    matrix_type: Optional[str] = None
     od_prescription: Optional[str] = None
     oe_prescription: Optional[str] = None
 
@@ -37,6 +38,7 @@ class BillingItemResponse(BaseModel):
     
     # Informações detalhadas da OS para a fatura de fechamento
     os_number: Optional[str] = None
+    client_order_number: Optional[str] = None
     client_name: Optional[str] = None
     lens_type: Optional[str] = None
     treatments: Optional[str] = None
@@ -80,6 +82,7 @@ class PendingBillingGroupResponse(BaseModel):
 class PendingOrderResponse(BaseModel):
     id: uuid.UUID
     os_number: str
+    client_order_number: Optional[str] = None
     client_name: Optional[str] = None
     status: str
     total_amount: float

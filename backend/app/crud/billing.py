@@ -128,6 +128,47 @@ async def get_pending_orders_by_store(db: AsyncSession, store_id: uuid.UUID) -> 
     return orders
 
 
+def _resolve_grade_display(matrix_type: Optional[str], refractive_index: Optional[float] = None, brand: Optional[str] = None, model_or_name: Optional[str] = None) -> str:
+    """
+    Retorna estritamente uma das 5 grades pertencentes da lente:
+    - Visão Simples
+    - 1.67
+    - Multifocal Acabado
+    - Multifocal
+    - Bloco Visão Simples
+    """
+    mt = (matrix_type or "").upper().strip()
+    if mt in ["LP_GRADE", "VISAO_SIMPLES", "VS", "GRADE"]:
+        return "Visão Simples"
+    if mt in ["GRADE_167", "1.67", "167"]:
+        return "1.67"
+    if mt in ["MF_ACB", "MULTIFOCAL_ACABADO"]:
+        return "Multifocal Acabado"
+    if mt in ["MF_BLOCO", "MULTIFOCAL", "BLOCO_MF"]:
+        return "Multifocal"
+    if mt in ["BLOCO_VS", "BLOCO_VISAO_SIMPLES"]:
+        return "Bloco Visão Simples"
+
+    if refractive_index and abs(float(refractive_index) - 1.67) < 0.015:
+        return "1.67"
+
+    combined = f"{brand or ''} {model_or_name or ''}".lower()
+    if "1.67" in combined or "167" in combined:
+        return "1.67"
+    if "bloco" in combined and ("vs" in combined or "vis" in combined or "simples" in combined):
+        return "Bloco Visão Simples"
+    if "bloco" in combined and ("mf" in combined or "multi" in combined):
+        return "Multifocal"
+    if "multifocal acabado" in combined or "mf acab" in combined or "mf_acb" in combined:
+        return "Multifocal Acabado"
+    if "multi" in combined or "mf" in combined:
+        return "Multifocal"
+    if "bloco" in combined:
+        return "Bloco Visão Simples"
+
+    return "Visão Simples"
+
+
 async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
     """
     Enriquece o item/OS de faturamento com descrições discriminadas de lentes,
@@ -144,6 +185,7 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
         item = db_or_item or item_or_none
 
     order = getattr(item, "service_order", None) or item
+    setattr(item, "client_order_number", getattr(order, "client_order_number", None))
 
     # 1. Tipo / Modelo da Lente (Exatamente conforme cadastrado no sistema)
     lens_name = None
@@ -348,12 +390,26 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
         lm = getattr(order.od_lens_inventory, "lens_model", None)
     if not lm and getattr(order, "oe_lens_inventory", None):
         lm = getattr(order.oe_lens_inventory, "lens_model", None)
+    if not lm and getattr(order, "lens_model_id", None) and db is not None:
+        try:
+            from backend.app.models.lens import LensModel
+            lm = (await db.execute(select(LensModel).where(LensModel.id == order.lens_model_id))).scalar_one_or_none()
+        except Exception:
+            pass
+
+    matrix_type = getattr(lm, "matrix_type", None) if lm else None
+    if not matrix_type and order_items:
+        matrix_type = next((getattr(i, "matrix_type", None) for i in order_items if getattr(i, "matrix_type", None)), None)
 
     lens_brand = getattr(lm, "brand", None) if lm else None
     lens_model_name = getattr(lm, "model", None) if lm else None
     lens_material = getattr(lm, "material", None) if lm else None
     lens_treatment = getattr(lm, "treatment", None) if lm else None
     lens_idx = float(lm.refractive_index) if lm and getattr(lm, "refractive_index", None) else None
+
+    # Mapeamento da grade pertencente (Visão Simples, 1.67, Multifocal Acabado, Multifocal, Bloco Visão Simples)
+    grade_display = _resolve_grade_display(matrix_type, lens_idx, lens_brand, lens_model_name or lens_name)
+    item.lens_type = grade_display
 
     if not lens_treatment and item.treatments and item.treatments != "Incolor / Sem Tratamento":
         lens_treatment = item.treatments
@@ -403,7 +459,7 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
 
         unit_p = round(lens_price / lens_qty, 2) if lens_qty > 0 else lens_price
         detailed.append(OSItemDetail(
-            name=lens_name,
+            name=grade_display,
             description=lens_desc,
             item_type="Lente",
             quantity=lens_qty,
@@ -414,6 +470,7 @@ async def enrich_billing_item(db_or_item: Any, item_or_none: Any = None):
             treatment=lens_treatment,
             material=lens_material,
             refractive_index=lens_idx,
+            matrix_type=matrix_type,
             od_prescription=od_presc,
             oe_prescription=oe_presc
         ))
