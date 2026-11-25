@@ -3,7 +3,7 @@ import {
   Layers, Plus, Trash2, Copy, Send, CheckCircle2, AlertTriangle, 
   Store, Package, Activity, ArrowRight, RefreshCw, Sparkles, Check
 } from 'lucide-react';
-import api from '../services/api';
+import api, { LensService } from '../services/api';
 
 const MATRIX_OPTIONS = [
   { value: 'LP_GRADE', label: 'Visão Simples', basePrice: 67.0 },
@@ -35,6 +35,7 @@ const createEmptyRow = (index = 1) => ({
   client_name: '',
   tray_number: String(index).padStart(2, '0'),
   matrix_type: 'LP_GRADE',
+  lens_model_id: '',
   od_spherical: 0.0,
   od_cylindrical: 0.0,
   od_axis: 0,
@@ -55,6 +56,8 @@ const createEmptyRow = (index = 1) => ({
 const EntradaMalote = ({ onNavigateToWorkflow }) => {
   const [stores, setStores] = useState([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [lensModels, setLensModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(true);
   const [batchRef, setBatchRef] = useState(() => {
     const d = new Date();
     const dateStr = d.toISOString().slice(0, 10).replace(/-/g, '');
@@ -71,25 +74,58 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     createEmptyRow(2)
   ]);
 
-  // Carrega lista de óticas
+  // Carrega lista de óticas e modelos de lentes
   useEffect(() => {
-    const fetchStores = async () => {
+    const fetchData = async () => {
       try {
         setLoadingStores(true);
-        const res = await api.get('/optical-stores/');
-        const list = res.data?.items || res.data || [];
-        setStores(list);
-        if (list.length > 0 && !selectedStoreId) {
-          setSelectedStoreId(list[0].id);
+        setLoadingModels(true);
+        const [storesRes, modelsRes] = await Promise.all([
+          api.get('/optical-stores/').catch(() => ({ data: [] })),
+          LensService.getModels().catch(() => ({ data: [] }))
+        ]);
+
+        const storeList = storesRes.data?.items || storesRes.data || [];
+        setStores(storeList);
+        if (storeList.length > 0 && !selectedStoreId) {
+          setSelectedStoreId(storeList[0].id);
         }
+
+        const modelList = modelsRes.data?.items || modelsRes.data || [];
+        setLensModels(modelList);
       } catch (err) {
-        console.error("Erro ao carregar óticas:", err);
+        console.error("Erro ao carregar dados iniciais:", err);
       } finally {
         setLoadingStores(false);
+        setLoadingModels(false);
       }
     };
-    fetchStores();
+    fetchData();
   }, []);
+
+  // Quando os modelos de lente carregarem, pré-seleciona o modelo padrão para cada linha
+  useEffect(() => {
+    if (lensModels.length > 0) {
+      setRows(prevRows => prevRows.map(r => {
+        if (!r.lens_model_id) {
+          const matching = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (r.matrix_type || 'LP_GRADE').trim().toUpperCase());
+          if (matching.length > 0) {
+            const first = matching[0];
+            const lPrice = parseFloat(first.sale_price || r.lens_price || 67.0);
+            const sPrice = parseFloat(r.service_price || 0.0);
+            const tPrice = parseFloat(r.treatment_price || 0.0);
+            return {
+              ...r,
+              lens_model_id: first.id,
+              lens_price: lPrice,
+              total_amount: Math.round((lPrice + sPrice + tPrice) * 100) / 100
+            };
+          }
+        }
+        return r;
+      }));
+    }
+  }, [lensModels]);
 
   // Recalcula valor de uma linha
   const handleRowChange = (id, field, value) => {
@@ -97,11 +133,35 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
       if (row.id !== id) return row;
       const updated = { ...row, [field]: value };
 
-      // Se mudou a matriz, ajusta o preço sugerido da lente
+      // Se mudou a matriz, ajusta o modelo e o preço sugerido da lente
       if (field === 'matrix_type') {
         const mat = MATRIX_OPTIONS.find(m => m.value === value);
         if (mat) {
           updated.lens_price = mat.basePrice;
+        }
+
+        // Filtra modelos disponíveis na matriz selecionada
+        const matchingModels = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === value.trim().toUpperCase());
+        if (matchingModels.length > 0) {
+          const currentValid = matchingModels.some(m => m.id === updated.lens_model_id);
+          if (!currentValid) {
+            updated.lens_model_id = matchingModels[0].id;
+            if (matchingModels[0].sale_price) {
+              updated.lens_price = parseFloat(matchingModels[0].sale_price);
+            }
+          }
+        } else {
+          updated.lens_model_id = '';
+        }
+      }
+
+      // Se mudou o modelo de lente específico na matriz
+      if (field === 'lens_model_id') {
+        const selectedM = lensModels.find(m => m.id === value);
+        if (selectedM) {
+          if (selectedM.sale_price) {
+            updated.lens_price = parseFloat(selectedM.sale_price);
+          }
         }
       }
 
@@ -189,6 +249,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
           client_name: r.client_name?.trim() || "Consumidor Final",
           tray_number: r.tray_number?.trim() || null,
           matrix_type: r.matrix_type,
+          lens_model_id: r.lens_model_id || null,
           od_spherical: parseFloat(r.od_spherical) || 0.0,
           od_cylindrical: parseFloat(r.od_cylindrical) || 0.0,
           od_axis: parseInt(r.od_axis) || 0,
@@ -309,7 +370,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   <tr style={{ background: '#f8fafc', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>OS</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Pedido Loja</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Grade</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Grade / Modelo</th>
                     <th style={{ padding: '8px 12px', textAlign: 'center' }}>Estoque</th>
                     <th style={{ padding: '8px 12px', textAlign: 'right' }}>Valor</th>
                   </tr>
@@ -323,8 +384,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                       <td style={{ padding: '8px 12px', color: '#334155' }}>
                         {res.client_order_number || '-'}
                       </td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>
-                        {res.grade_name}
+                      <td style={{ padding: '8px 12px' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{res.grade_name}</div>
+                        {res.lens_model_name && res.lens_model_name !== res.grade_name && (
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{res.lens_model_name}</div>
+                        )}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                         {res.inventory_deducted ? (
@@ -494,6 +558,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
           {rows.map((row, idx) => {
             const isMF = row.matrix_type === 'MF_ACB' || row.matrix_type === 'MF_BLOCO';
+            const modelsInMatrix = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (row.matrix_type || 'LP_GRADE').trim().toUpperCase());
 
             return (
               <div 
@@ -504,15 +569,17 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   border: '1px solid rgba(224, 230, 240, 0.95)',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
                   padding: '18px 20px',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  overflowX: 'auto'
                 }}
               >
                 {/* Linha 1: Dados Comerciais do Pedido e Tipo de Lente */}
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'minmax(40px, 50px) minmax(130px, 1fr) minmax(160px, 1.2fr) minmax(170px, 1.2fr) minmax(180px, 1.3fr) minmax(160px, 1.2fr) minmax(110px, 0.9fr) minmax(80px, 90px)',
-                  gap: '12px',
-                  alignItems: 'end'
+                  gridTemplateColumns: 'minmax(38px, 46px) minmax(105px, 0.9fr) minmax(125px, 1fr) minmax(135px, 1.1fr) minmax(175px, 1.5fr) minmax(135px, 1fr) minmax(125px, 0.9fr) minmax(105px, 0.8fr) minmax(78px, 86px)',
+                  gap: '10px',
+                  alignItems: 'end',
+                  minWidth: '1020px'
                 }}>
                   
                   {/* Badge # */}
@@ -600,6 +667,48 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                       {MATRIX_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
+                    </select>
+                  </div>
+
+                  {/* Modelo de Lente Disponível na Matriz Selecionada */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))' }}>
+                        Modelo de Lente *
+                      </label>
+                      {modelsInMatrix.length > 0 && (
+                        <span style={{ fontSize: '0.66rem', color: '#059669', fontWeight: 700, background: 'rgba(16, 185, 129, 0.1)', padding: '1px 5px', borderRadius: '4px' }}>
+                          {modelsInMatrix.length} disp.
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      value={row.lens_model_id || ''}
+                      onChange={(e) => handleRowChange(row.id, 'lens_model_id', e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 8px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        background: 'white',
+                        color: row.lens_model_id ? 'hsl(var(--text-primary))' : '#64748b'
+                      }}
+                    >
+                      {modelsInMatrix.length === 0 ? (
+                        <option value="">Padrão da Matriz</option>
+                      ) : (
+                        <>
+                          <option value="">-- Selecione o Modelo --</option>
+                          {modelsInMatrix.map(m => (
+                            <option key={m.id} value={m.id}>
+                              {m.brand || m.name} — {m.treatment || 'Incolor'} | {m.material || 'Resina'} (n={m.refractive_index || '1.56'}) — R$ {parseFloat(m.sale_price || 0).toFixed(2)}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 

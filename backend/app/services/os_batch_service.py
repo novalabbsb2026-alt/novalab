@@ -236,6 +236,7 @@ class OSBatchService:
                 status=new_os.status,
                 total_amount=os_total,
                 grade_name=grade_label,
+                lens_model_name=(f"{chosen_model.brand} - {chosen_model.name}") if (chosen_model and chosen_model.name) else (chosen_model.brand if chosen_model else grade_label),
                 inventory_deducted=deducted,
                 inventory_warning=inv_warning
             ))

@@ -50,6 +50,7 @@ class OSBatchItemResult(BaseModel):
     status: str
     total_amount: float
     grade_name: str
+    lens_model_name: Optional[str] = None
     inventory_deducted: bool
     inventory_warning: Optional[str] = None
 
