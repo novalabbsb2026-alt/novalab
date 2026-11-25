@@ -21,6 +21,26 @@ const OSWorkflow = ({ onOpenMalote }) => {
     return savedMode === 'agile' ? 'Em Produção' : 'Recebida';
   }); 
 
+  // Filtro inteligente para Concluídas e Canceladas (Padrão: Apenas ordens do dia)
+  const [filterTodayOnly, setFilterTodayOnly] = useState(true);
+
+  const isSameDay = (dateStr) => {
+    if (!dateStr) return false;
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      return d.getDate() === now.getDate() &&
+             d.getMonth() === now.getMonth() &&
+             d.getFullYear() === now.getFullYear();
+    } catch {
+      return false;
+    }
+  };
+
+  const isArchiveTab = activeSubTab === 'Concluída' || activeSubTab === 'Cancelada';
+  const todayOrders = orders.filter(os => isSameDay(os.updated_at || os.created_at));
+  const displayedOrders = (isArchiveTab && filterTodayOnly) ? todayOrders : orders; 
+
   // Modal Rápido de Registro de Quebra / Scrap
   const [breakageModal, setBreakageModal] = useState({
     isOpen: false,
@@ -629,14 +649,78 @@ const OSWorkflow = ({ onOpenMalote }) => {
         </div>
       </div>
 
+      {/* Barra de Filtro Rápido: Hoje vs Histórico Completo (Concluídas e Canceladas) */}
+      {isArchiveTab && !loading && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+          background: 'white',
+          padding: '12px 18px',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0',
+          marginBottom: '20px',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#334155' }}>
+            <Clock size={16} style={{ color: 'hsl(var(--primary))' }} />
+            <span>
+              Exibindo: <strong>{filterTodayOnly ? `Apenas Ordens de Hoje (${todayOrders.length})` : `Histórico Completo (${orders.length})`}</strong>
+            </span>
+            {filterTodayOnly && orders.length > todayOrders.length && (
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                ({orders.length - todayOrders.length} ordens de dias anteriores arquivadas)
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setFilterTodayOnly(true)}
+              className={`btn ${filterTodayOnly ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                padding: '6px 14px',
+                fontSize: '0.8rem',
+                fontWeight: filterTodayOnly ? 800 : 500,
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              📅 Apenas Hoje ({todayOrders.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTodayOnly(false)}
+              className={`btn ${!filterTodayOnly ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                padding: '6px 14px',
+                fontSize: '0.8rem',
+                fontWeight: !filterTodayOnly ? 800 : 500,
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              📜 Ver Histórico Completo ({orders.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '30px', color: 'hsl(var(--text-muted))' }}>
           <RefreshCw className="animate-spin" size={20} style={{ margin: '0 auto 10px auto' }} />
           <span>Atualizando Ordens de Serviço...</span>
         </div>
-      ) : orders.length > 0 ? (
+      ) : displayedOrders.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {orders.map((os) => {
+          {displayedOrders.map((os) => {
             const form = allocationForms[os.id] || {};
             const isExpanded = expandedOsId === os.id;
             const isHistoryExpanded = expandedHistoryId === os.id;
@@ -1300,8 +1384,31 @@ const OSWorkflow = ({ onOpenMalote }) => {
           })}
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '40px', border: '1px dashed var(--border-glass)', borderRadius: '12px' }}>
-          <p>Nenhuma Ordem de Serviço encontrada nesta bancada.</p>
+        <div style={{ textAlign: 'center', padding: '40px 20px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+          {isArchiveTab && filterTodayOnly ? (
+            <div>
+              <CheckCircle size={36} style={{ color: '#10b981', margin: '0 auto 10px auto' }} />
+              <h4 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>
+                Nenhuma ordem {activeSubTab === 'Concluída' ? 'concluída' : 'cancelada'} hoje até o momento
+              </h4>
+              <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem' }}>
+                Existem <strong>{orders.length} ordens</strong> registradas em dias anteriores no histórico.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setFilterTodayOnly(false)}
+                style={{ fontSize: '0.82rem', padding: '7px 18px', fontWeight: 700 }}
+              >
+                📜 Visualizar Histórico Completo ({orders.length})
+              </button>
+            </div>
+          ) : (
+            <div>
+              <AlertTriangle size={36} style={{ color: '#94a3b8', margin: '0 auto 10px auto' }} />
+              <h4 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>Nenhuma Ordem de Serviço encontrada nesta etapa.</h4>
+            </div>
+          )}
         </div>
       )}
       {/* Modal de Cancelamento de OS */}

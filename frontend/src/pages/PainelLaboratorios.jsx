@@ -2193,7 +2193,35 @@ export default function PainelLaboratorios({
                   Gestão de chamados (SLA), comunicados globais em tempo real e automação WhatsApp
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewBroadcastForm({
+                      title: 'Novidades no Sistema: Mais Agilidade nos Seus Pedidos',
+                      message: 'Liberamos melhorias importantes na plataforma: 1. Entrada Rápida por Malote (cadastro ágil de múltiplos pedidos no mesmo lote); 2. Seleção direta do Modelo de Lente por Matriz; 3. Bancada Ágil em 2 etapas com maior velocidade de produção; 4. Visualização otimizada das ordens do dia; 5. Espelho de fatura limpo e transparente com o número do seu pedido de loja destacado.',
+                      type: 'info'
+                    });
+                    setShowNewBroadcastModal(true);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#1d4ed8',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  title="Carregar mensagem pronta de novidades e atualização do sistema para os clientes"
+                >
+                  <Sparkles size={14} /> 📢 Comunicado de Atualização (Template Pronto)
+                </button>
+
                 <button
                   onClick={() => setShowNewBroadcastModal(true)}
                   style={{
