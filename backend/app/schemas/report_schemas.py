@@ -20,6 +20,13 @@ class ProductionOSItem(BaseReportSchema):
     priority: str
     production_route: Optional[str] = None
     lens_model_name: Optional[str] = None
+    lens_brand: Optional[str] = None
+    lens_treatment: Optional[str] = None
+    lens_material: Optional[str] = None
+    lens_refractive_index: Optional[float] = None
+    matrix_type: Optional[str] = None
+    grade_label: Optional[str] = None
+    optical_spec: Optional[str] = None
     od_degree: Optional[str] = None
     oe_degree: Optional[str] = None
     total_amount: Decimal = Decimal("0.00")

@@ -140,18 +140,17 @@ async def export_report_excel(
         rows = []
         for o in data.orders:
             rows.append({
-                "Número OS": o.os_number,
                 "Pedido Loja": o.client_order_number or "",
+                "Nº OS": o.os_number,
                 "Ótica Cliente": o.optical_store_name,
-                "Bandeja": o.tray_number or "",
-                "Tipo OS": o.os_type,
-                "Status": o.status,
-                "Prioridade": o.priority,
-                "Rota de Produção": o.production_route,
-                "Modelo Lente": o.lens_model_name or "",
+                "Marca Lente": o.lens_brand or "PEREGO",
+                "Modelo Lente": o.lens_model_name or o.grade_label or "",
+                "Tratamento": o.lens_treatment or "Incolor",
+                "Material": f"{o.lens_material or 'Resina'} ({o.lens_refractive_index})" if o.lens_refractive_index else (o.lens_material or ""),
+                "Especificação Ótica": o.optical_spec or "",
                 "Grau OD": o.od_degree or "",
                 "Grau OE": o.oe_degree or "",
-                "Lead Time (Horas)": o.lead_time_hours if o.lead_time_hours is not None else 0.0,
+                "Status": o.status,
                 "Valor Total (R$)": float(o.total_amount),
                 "Data Criação": o.created_at.strftime("%d/%m/%Y %H:%M")
             })

@@ -162,6 +162,33 @@ async def get_production_analytic_report(
         od_str = f"Esf: {float(o.od_spherical or 0):+.2f} | Cil: {float(o.od_cylindrical or 0):+.2f}" if o.od_spherical is not None else None
         oe_str = f"Esf: {float(o.oe_spherical or 0):+.2f} | Cil: {float(o.oe_cylindrical or 0):+.2f}" if o.oe_spherical is not None else None
 
+        # Montagem de especificação óptica detalhada (Grau OD e OE)
+        od_spec_parts = []
+        if o.od_spherical is not None: od_spec_parts.append(f"Esf {float(o.od_spherical):+.2f}")
+        if o.od_cylindrical is not None and float(o.od_cylindrical) != 0: od_spec_parts.append(f"Cil {float(o.od_cylindrical):+.2f}")
+        if o.od_axis is not None and int(o.od_axis) > 0: od_spec_parts.append(f"Eixo {int(o.od_axis)}°")
+        if o.od_addition is not None and float(o.od_addition) > 0: od_spec_parts.append(f"Add +{float(o.od_addition):.2f}")
+        od_spec = "OD: " + " ".join(od_spec_parts) if od_spec_parts else None
+
+        oe_spec_parts = []
+        if o.oe_spherical is not None: oe_spec_parts.append(f"Esf {float(o.oe_spherical):+.2f}")
+        if o.oe_cylindrical is not None and float(o.oe_cylindrical) != 0: oe_spec_parts.append(f"Cil {float(o.oe_cylindrical):+.2f}")
+        if o.oe_axis is not None and int(o.oe_axis) > 0: oe_spec_parts.append(f"Eixo {int(o.oe_axis)}°")
+        if o.oe_addition is not None and float(o.oe_addition) > 0: oe_spec_parts.append(f"Add +{float(o.oe_addition):.2f}")
+        oe_spec = "OE: " + " ".join(oe_spec_parts) if oe_spec_parts else None
+
+        spec_full = " | ".join(filter(None, [od_spec, oe_spec])) or None
+
+        lm = o.lens_model
+        grade_labels = {
+            "LP_GRADE": "Visão Simples",
+            "GRADE_167": "1.67",
+            "MF_ACB": "Multifocal Acabado",
+            "MF_BLOCO": "Multifocal",
+            "BLOCO_VS": "Bloco Visão Simples"
+        }
+        m_type = lm.matrix_type if lm else None
+
         order_items.append(
             ProductionOSItem(
                 id=o.id,
@@ -173,7 +200,14 @@ async def get_production_analytic_report(
                 status=st,
                 priority=o.priority or "NORMAL",
                 production_route=route,
-                lens_model_name=o.lens_model.name or o.lens_model.brand if o.lens_model else None,
+                lens_model_name=lm.name or lm.brand if lm else None,
+                lens_brand=lm.brand if lm else None,
+                lens_treatment=lm.treatment if lm else None,
+                lens_material=lm.material if lm else None,
+                lens_refractive_index=float(lm.refractive_index) if (lm and lm.refractive_index) else None,
+                matrix_type=m_type,
+                grade_label=grade_labels.get(m_type, "Visão Simples") if m_type else None,
+                optical_spec=spec_full,
                 od_degree=od_str,
                 oe_degree=oe_str,
                 total_amount=o.total_amount or Decimal("0.00"),

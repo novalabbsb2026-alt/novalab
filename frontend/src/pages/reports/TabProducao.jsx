@@ -128,20 +128,18 @@ export default function TabProducao() {
 
   const columns = [
     {
-      key: 'os_number',
-      label: 'Nº OS',
-      render: (row) => (
-        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: 'hsl(var(--primary))' }}>
-          #{row.os_number}
-        </span>
-      ),
-    },
-    {
       key: 'client_order_number',
       label: 'Pedido Loja',
-      render: (row) => row.client_order_number ? (
-        <span style={{ fontFamily: 'monospace', color: 'hsl(var(--text-secondary))' }}>{row.client_order_number}</span>
-      ) : <span style={{ color: 'hsl(var(--text-muted))' }}>-</span>,
+      render: (row) => (
+        <div>
+          <div style={{ fontWeight: 700, fontFamily: 'monospace', color: 'hsl(var(--text-primary))' }}>
+            {row.client_order_number || '-'}
+          </div>
+          <div style={{ fontSize: '0.7rem', color: 'hsl(var(--text-muted))', fontFamily: 'monospace' }}>
+            #{row.os_number}
+          </div>
+        </div>
+      ),
     },
     {
       key: 'optical_store_name',
@@ -153,71 +151,82 @@ export default function TabProducao() {
       ),
     },
     {
-      key: 'tray_number',
-      label: 'Bandeja',
-      align: 'center',
-      render: (row) => row.tray_number ? (
-        <span 
-          style={{
-            padding: '2px 8px',
-            borderRadius: '6px',
-            background: 'rgba(241, 245, 249, 0.9)',
-            border: '1px solid rgba(203, 213, 225, 0.8)',
-            fontFamily: 'monospace',
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            color: 'hsl(var(--text-primary))'
-          }}
-        >
-          {row.tray_number}
-        </span>
-      ) : <span style={{ color: 'hsl(var(--text-muted))' }}>-</span>,
+      key: 'lens_brand_model',
+      label: 'Marca & Modelo',
+      render: (row) => (
+        <div>
+          <span 
+            style={{ 
+              display: 'inline-block',
+              fontWeight: 800, 
+              fontSize: '0.72rem',
+              color: 'hsl(var(--primary))',
+              background: 'rgba(37, 99, 235, 0.08)',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              marginBottom: '2px',
+              border: '1px solid rgba(37, 99, 235, 0.2)'
+            }}
+          >
+            {row.lens_brand || 'PEREGO'}
+          </span>
+          <div 
+            style={{ 
+              color: 'hsl(var(--text-primary))', 
+              fontSize: '0.78rem', 
+              fontWeight: 600,
+              maxWidth: '200px', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis', 
+              whiteSpace: 'nowrap' 
+            }}
+            title={row.lens_model_name || row.grade_label}
+          >
+            {row.lens_model_name || row.grade_label || 'Lente Padrão'}
+          </div>
+        </div>
+      ),
     },
     {
-      key: 'production_route',
-      label: 'Rota',
+      key: 'lens_treatment',
+      label: 'Tratamento & Material',
+      render: (row) => (
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '0.78rem', color: 'hsl(var(--text-primary))' }}>
+            {row.lens_treatment || 'Incolor'}
+          </div>
+          <div style={{ fontSize: '0.7rem', color: 'hsl(var(--text-secondary))' }}>
+            {row.lens_material || 'Resina'}{row.lens_refractive_index ? ` (${row.lens_refractive_index})` : ''}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'optical_spec',
+      label: 'Especificação Ótica',
       render: (row) => {
-        if (row.production_route === 'EXPRESSA_FACETAMENTO') {
-          return (
-            <span 
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '2px 8px',
-                borderRadius: '8px',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                background: 'rgba(245, 158, 11, 0.12)',
-                color: 'hsl(35, 85%, 40%)',
-                border: '1px solid rgba(245, 158, 11, 0.25)'
-              }}
-            >
-              <Zap size={12} /> Expressa
-            </span>
-          );
+        if (!row.od_degree && !row.oe_degree && !row.optical_spec) {
+          return <span style={{ color: 'hsl(var(--text-muted))', fontSize: '0.75rem' }}>-</span>;
         }
-        if (row.production_route === 'SURFACAGEM_CNC') {
-          return (
-            <span 
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '2px 8px',
-                borderRadius: '8px',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                background: 'rgba(147, 51, 234, 0.12)',
-                color: 'hsl(263, 75%, 50%)',
-                border: '1px solid rgba(147, 51, 234, 0.25)'
-              }}
-            >
-              <Cpu size={12} /> Surfaçagem CNC
-            </span>
-          );
-        }
-        return <span style={{ color: 'hsl(var(--text-muted))', fontSize: '0.75rem' }}>{row.production_route || 'Padrão'}</span>;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontFamily: 'monospace', fontSize: '0.72rem' }}>
+            {row.od_degree && (
+              <div style={{ color: 'hsl(215, 85%, 45%)', whiteSpace: 'nowrap' }}>
+                <strong style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '1px 4px', borderRadius: '3px', marginRight: '4px' }}>OD</strong>
+                {row.od_degree}
+              </div>
+            )}
+            {row.oe_degree && (
+              <div style={{ color: 'hsl(145, 80%, 35%)', whiteSpace: 'nowrap' }}>
+                <strong style={{ background: 'rgba(34, 197, 94, 0.1)', padding: '1px 4px', borderRadius: '3px', marginRight: '4px' }}>OE</strong>
+                {row.oe_degree}
+              </div>
+            )}
+            {!row.od_degree && !row.oe_degree && row.optical_spec && (
+              <span style={{ color: 'hsl(var(--text-secondary))' }}>{row.optical_spec}</span>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -231,7 +240,8 @@ export default function TabProducao() {
           fontWeight: 700,
           background: 'rgba(241, 245, 249, 0.9)',
           color: 'hsl(var(--text-secondary))',
-          border: '1px solid rgba(203, 213, 225, 0.8)'
+          border: '1px solid rgba(203, 213, 225, 0.8)',
+          whiteSpace: 'nowrap'
         };
         if (row.status === 'PRONTA' || row.status === 'ENTREGUE') {
           styleBadge = { ...styleBadge, background: 'rgba(34, 197, 94, 0.12)', color: 'hsl(142, 75%, 32%)', border: '1px solid rgba(34, 197, 94, 0.3)' };
@@ -244,25 +254,6 @@ export default function TabProducao() {
         }
         return <span style={styleBadge}>{row.status}</span>;
       },
-    },
-    {
-      key: 'lens_model_name',
-      label: 'Lente / Produto',
-      render: (row) => (
-        <span style={{ color: 'hsl(var(--text-primary))', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
-          {row.lens_model_name || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'lead_time_hours',
-      label: 'Lead Time',
-      align: 'right',
-      render: (row) => (
-        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'hsl(var(--text-secondary))' }}>
-          {row.lead_time_hours !== null && row.lead_time_hours !== undefined ? `${row.lead_time_hours}h` : '-'}
-        </span>
-      ),
     },
     {
       key: 'total_amount',
@@ -278,7 +269,7 @@ export default function TabProducao() {
       key: 'created_at',
       label: 'Data/Hora',
       render: (row) => (
-        <span style={{ color: 'hsl(var(--text-muted))', fontSize: '0.75rem' }}>
+        <span style={{ color: 'hsl(var(--text-muted))', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
           {new Date(row.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
         </span>
       ),

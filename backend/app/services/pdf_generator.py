@@ -268,32 +268,42 @@ def generate_production_pdf(prod_data: Dict[str, Any], lab_info: Dict[str, Any] 
 
     table_data = [
         [
-            Paragraph("<b>Nº OS</b>", styles['Normal']),
-            Paragraph("<b>ÓTICA / CLIENTE</b>", styles['Normal']),
-            Paragraph("<b>BANDEJA</b>", styles['Normal']),
-            Paragraph("<b>ROTA</b>", styles['Normal']),
+            Paragraph("<b>PEDIDO / OS</b>", styles['Normal']),
+            Paragraph("<b>ÓTICA CLIENTE</b>", styles['Normal']),
+            Paragraph("<b>MARCA & MODELO</b>", styles['Normal']),
+            Paragraph("<b>TRATAMENTO</b>", styles['Normal']),
+            Paragraph("<b>ESPECIFICAÇÃO ÓTICA</b>", styles['Normal']),
             Paragraph("<b>STATUS</b>", styles['Normal']),
-            Paragraph("<b>LEAD TIME</b>", styles['Normal']),
             Paragraph("<b>VALOR (R$)</b>", styles['Normal'])
         ]
     ]
 
     for o in prod_data.get("orders", [])[:250]:
-        lt_str = f"{o.get('lead_time_hours', 0.0)}h" if o.get('lead_time_hours') is not None else "-"
         val = Decimal(str(o.get("total_amount", 0.0)))
-        route_short = "Expressa" if "EXPRESSA" in o.get("production_route", "") else ("CNC" if "SURFACAGEM" in o.get("production_route", "") else "Reparo")
+        ped = o.get("client_order_number") or o.get("os_number", "")
+        brand_model = f"<b>{o.get('lens_brand') or 'PEREGO'}</b><br/>{o.get('lens_model_name') or o.get('grade_label') or '-'}"
+        treatment = f"{o.get('lens_treatment') or 'Incolor'}"
+        if o.get('lens_material'):
+            treatment += f"<br/><font size='6' color='#64748b'>{o.get('lens_material')}</font>"
+        
+        spec = o.get("optical_spec") or "-"
+        if o.get("od_degree") or o.get("oe_degree"):
+            spec_lines = []
+            if o.get("od_degree"): spec_lines.append(f"<font color='#1d4ed8'>OD:</font> {o.get('od_degree')}")
+            if o.get("oe_degree"): spec_lines.append(f"<font color='#15803d'>OE:</font> {o.get('oe_degree')}")
+            spec = "<br/>".join(spec_lines)
 
         table_data.append([
-            o.get("os_number", ""),
-            Paragraph(o.get("optical_store_name", "")[:26], styles['Normal']),
-            o.get("tray_number", "-") or "-",
-            route_short,
+            Paragraph(f"<b>{ped}</b><br/><font size='6' color='#64748b'>#{o.get('os_number', '')}</font>", styles['Normal']),
+            Paragraph(o.get("optical_store_name", "")[:24], styles['Normal']),
+            Paragraph(brand_model, styles['Normal']),
+            Paragraph(treatment, styles['Normal']),
+            Paragraph(spec, styles['Normal']),
             Paragraph(o.get("status", ""), styles['Normal']),
-            lt_str,
             f"R$ {val:.2f}"
         ])
 
-    table = Table(table_data, colWidths=[80, 140, 60, 60, 95, 50, 55])
+    table = Table(table_data, colWidths=[70, 105, 95, 75, 110, 45, 40])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#0f172a")),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
