@@ -11,7 +11,9 @@ from backend.app.schemas.os import (
     ServiceOrderItemCreate, ServiceOrderItemResponse, CQInspectionCreate
 )
 from backend.app.schemas.os_factory import OSCreateFactorySchema
+from backend.app.schemas.os_batch import OSBatchCreateRequest, OSBatchCreateResponse
 from backend.app.services.os_factory_service import OSFactoryService
+from backend.app.services.os_batch_service import OSBatchService
 from backend.app.crud import os as crud_os
 from backend.app.services.ai_ocr import analyze_recipe_image
 from decimal import Decimal
@@ -435,4 +437,22 @@ async def cancel_service_order_endpoint(
             detail="Ordem de Serviço não encontrada."
         )
     return res
+
+@router.post("/batch-malote", response_model=OSBatchCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_batch_malote_endpoint(
+    payload: OSBatchCreateRequest,
+    current_user: User = Depends(get_current_active_operator),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Cadastra em lote múltiplos pedidos/óculos recebidos no mesmo malote da mesma ótica.
+    Gera as Ordens de Serviço, executa baixas automáticas das lentes no estoque,
+    e prepara as peças para a Bancada Ágil e fechamento financeiro unificado.
+    """
+    return await OSBatchService.create_batch_orders(
+        db=db,
+        payload=payload,
+        current_user_id=current_user.id
+    )
+
 

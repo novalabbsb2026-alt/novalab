@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api, { LensService, OSService, getBaseUrl, getWsUrl } from '../services/api';
 
-import { Play, Check, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Info, DollarSign, History, User, Clock, MapPin, ClipboardList, Trash2, Barcode, Camera, Keyboard, CheckCircle, PackageCheck, Zap, X } from 'lucide-react';
+import { Play, Check, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Info, DollarSign, History, User, Clock, MapPin, ClipboardList, Trash2, Barcode, Camera, Keyboard, CheckCircle, PackageCheck, Zap, X, Package } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import OSDetail from './OSDetail';
 
-const OSWorkflow = () => {
+const OSWorkflow = ({ onOpenMalote }) => {
   const [orders, setOrders] = useState([]);
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -602,7 +602,18 @@ const OSWorkflow = () => {
         </div>
 
         {/* Botão de escaneamento de OS de bancada */}
-        <div style={{ marginLeft: '10px' }}>
+        <div style={{ marginLeft: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {onOpenMalote && (
+            <button 
+              type="button"
+              className="btn btn-secondary" 
+              style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
+              onClick={onOpenMalote}
+            >
+              <Package size={16} /> + Entrada por Malote
+            </button>
+          )}
+
           <button 
             className="btn btn-primary" 
             style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}

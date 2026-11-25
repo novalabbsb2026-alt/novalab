@@ -38,8 +38,9 @@ import DashboardDRE from './components/DashboardDRE';
 import RelatoriosHub from './pages/reports/RelatoriosHub';
 import TenantManagementModal from './components/TenantManagementModal';
 import PainelLaboratorios from './pages/PainelLaboratorios';
+import EntradaMalote from './components/EntradaMalote';
 import { maskCNPJ, maskPhone, maskCEP, maskIE } from './utils/maskHelper';
-import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles, Menu, X, LogOut } from 'lucide-react';
+import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles, Menu, X, LogOut, Package } from 'lucide-react';
 
 
 
@@ -559,13 +560,20 @@ function App() {
           <div className="header-dropdown">
             <button 
               type="button"
-              className={`dropdown-trigger ${['os-upload', 'os-workflow', 'os-dashboard', 'os-factory-register', 'financial-blocked-orders'].includes(activeTab) ? 'active' : ''}`}
+              className={`dropdown-trigger ${['os-upload', 'os-workflow', 'os-dashboard', 'os-factory-register', 'os-malote', 'financial-blocked-orders'].includes(activeTab) ? 'active' : ''}`}
               onClick={() => setOpenDropdown(openDropdown === 'os' ? null : 'os')}
             >
               <Activity size={16} /> Bancada OS <ChevronDown size={14} />
             </button>
             {openDropdown === 'os' && (
               <div className="dropdown-menu">
+                <button 
+                  type="button"
+                  className={`dropdown-item ${activeTab === 'os-malote' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('os-malote'); setOpenDropdown(null); }}
+                >
+                  <Package size={14} style={{ color: 'hsl(var(--primary))' }} /> Entrada por Malote / Lote
+                </button>
                 <button 
                   type="button"
                   className={`dropdown-item ${activeTab === 'os-factory-register' || activeTab === 'os-upload' ? 'active' : ''}`}
@@ -905,6 +913,9 @@ function App() {
                 </button>
                 {mobileExpandedGroup === 'os' && (
                   <div className="mobile-nav-subitems">
+                    <button type="button" className={`mobile-nav-item ${activeTab === 'os-malote' ? 'active' : ''}`} onClick={() => { setActiveTab('os-malote'); setMobileDrawerOpen(false); }}>
+                      <Package size={16} /> Entrada por Malote / Lote
+                    </button>
                     <button type="button" className={`mobile-nav-item ${activeTab === 'os-factory-register' || activeTab === 'os-upload' ? 'active' : ''}`} onClick={() => { setActiveTab('os-factory-register'); setMobileDrawerOpen(false); }}>
                       <Plus size={16} /> Nova OS de Fábrica
                     </button>
@@ -1088,12 +1099,18 @@ function App() {
           <OSRegistrationForm onOSCreated={() => setActiveTab('os-workflow')} />
         )}
 
+        {activeTab === 'os-malote' && (
+          <TabErrorBoundary tabName="Entrada por Malote">
+            <EntradaMalote onNavigateToWorkflow={() => setActiveTab('os-workflow')} />
+          </TabErrorBoundary>
+        )}
+
         {activeTab === 'os-upload' && (
           <OSUpload onOSCreated={() => setActiveTab('os-workflow')} />
         )}
 
         {activeTab === 'os-workflow' && (
-          <OSWorkflow />
+          <OSWorkflow onOpenMalote={() => setActiveTab('os-malote')} />
         )}
 
         {activeTab === 'os-dashboard' && (
