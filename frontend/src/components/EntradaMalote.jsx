@@ -28,6 +28,24 @@ const SERVICE_OPTIONS = [
   { value: 'Sem Montagem (Apenas Lentes)', label: 'Sem Montagem', price: 0.0 },
 ];
 
+const parseDiopter = (val) => {
+  if (val === null || val === undefined || val === '') return 0.0;
+  const normalized = String(val).trim().replace(',', '.');
+  const parsed = parseFloat(normalized);
+  return Number.isNaN(parsed) ? 0.0 : parsed;
+};
+
+const sanitizeDiopterInput = (raw, allowNegative = true) => {
+  return String(raw).replace(allowNegative ? /[^0-9.,+-]/g : /[^0-9.,+]/g, '');
+};
+
+const formatDiopterOnBlur = (val, { allowNegative = true, emptyIfBlank = false } = {}) => {
+  if (emptyIfBlank && String(val ?? '').trim() === '') return '';
+  let num = parseDiopter(val);
+  if (!allowNegative && num < 0) num = Math.abs(num);
+  return num.toFixed(2);
+};
+
 const createEmptyRow = (index = 1) => ({
   id: Date.now() + Math.random(),
   client_order_number: '',
@@ -36,15 +54,15 @@ const createEmptyRow = (index = 1) => ({
   lens_model_id: '',
   eye_target: 'OD_OE',
   has_prescription: true,
-  od_spherical: 0.0,
-  od_cylindrical: 0.0,
-  od_axis: 0,
-  od_addition: 0.0,
+  od_spherical: '0.00',
+  od_cylindrical: '0.00',
+  od_axis: '0',
+  od_addition: '0.00',
   od_base_curve: '',
-  oe_spherical: 0.0,
-  oe_cylindrical: 0.0,
-  oe_axis: 0,
-  oe_addition: 0.0,
+  oe_spherical: '0.00',
+  oe_cylindrical: '0.00',
+  oe_axis: '0',
+  oe_addition: '0.00',
   oe_base_curve: '',
   service_type: 'Montagem Padrão',
   treatment: 'Incolor / Sem Tratamento',
@@ -252,7 +270,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
   // Totais consolidados do malote
   const totalOrders = rows.length;
   const totalLenses = rows.reduce((acc, r) => acc + ((r.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1), 0);
-  const totalBatchPrice = rows.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
+  const totalBatchPrice = rows.reduce((acc, r) => acc + parseDiopter(r.total_amount), 0);
 
   // Envio do Lote
   const handleSubmitBatch = async (e) => {
@@ -287,22 +305,22 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             lens_model_id: r.lens_model_id || null,
             eye_target: isMultifocalRow ? (r.eye_target || 'OD_OE') : 'OD_OE',
             has_prescription: r.has_prescription !== false,
-            od_spherical: parseFloat(r.od_spherical) || 0.0,
-            od_cylindrical: parseFloat(r.od_cylindrical) || 0.0,
-            od_axis: parseInt(r.od_axis) || 0,
-            od_addition: parseFloat(r.od_addition) || 0.0,
-            od_base_curve: parseFloat(r.od_base_curve) || 0.0,
-            oe_spherical: parseFloat(r.oe_spherical) || 0.0,
-            oe_cylindrical: parseFloat(r.oe_cylindrical) || 0.0,
-            oe_axis: parseInt(r.oe_axis) || 0,
-            oe_addition: parseFloat(r.oe_addition) || 0.0,
-            oe_base_curve: parseFloat(r.oe_base_curve) || 0.0,
+            od_spherical: parseDiopter(r.od_spherical),
+            od_cylindrical: parseDiopter(r.od_cylindrical),
+            od_axis: Math.min(180, Math.max(0, parseInt(r.od_axis, 10) || 0)),
+            od_addition: Math.abs(parseDiopter(r.od_addition)),
+            od_base_curve: Math.abs(parseDiopter(r.od_base_curve)),
+            oe_spherical: parseDiopter(r.oe_spherical),
+            oe_cylindrical: parseDiopter(r.oe_cylindrical),
+            oe_axis: Math.min(180, Math.max(0, parseInt(r.oe_axis, 10) || 0)),
+            oe_addition: Math.abs(parseDiopter(r.oe_addition)),
+            oe_base_curve: Math.abs(parseDiopter(r.oe_base_curve)),
             service_type: r.service_type,
             treatment: selectedModel?.treatment || r.treatment || 'Incolor / Sem Tratamento',
-            lens_price: parseFloat(r.lens_price) || 0.0,
-            service_price: parseFloat(r.service_price) || 0.0,
+            lens_price: parseDiopter(r.lens_price),
+            service_price: parseDiopter(r.service_price),
             treatment_price: 0.0,
-            total_amount: parseFloat(r.total_amount) || 0.0,
+            total_amount: parseDiopter(r.total_amount),
             special_instructions: r.special_instructions?.trim() || null
           };
         })
@@ -969,10 +987,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                                 <div>
                                   <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '2px' }}>Base *</span>
                                   <input
-                                    type="number"
-                                    step="0.25"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={row.od_base_curve}
-                                    onChange={(e) => handleRowChange(row.id, 'od_base_curve', e.target.value)}
+                                    onChange={(e) => handleRowChange(row.id, 'od_base_curve', sanitizeDiopterInput(e.target.value, false))}
+                                    onBlur={(e) => handleRowChange(row.id, 'od_base_curve', formatDiopterOnBlur(e.target.value, { allowNegative: false, emptyIfBlank: true }))}
                                     placeholder="4.00"
                                     style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.8rem', fontWeight: 800, color: '#0369a1' }}
                                   />
@@ -982,10 +1001,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                               <div>
                                 <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Esférico</span>
                                 <input
-                                  type="number"
-                                  step="0.25"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={row.od_spherical}
-                                  onChange={(e) => handleRowChange(row.id, 'od_spherical', parseFloat(e.target.value) || 0)}
+                                  onChange={(e) => handleRowChange(row.id, 'od_spherical', sanitizeDiopterInput(e.target.value, true))}
+                                  onBlur={(e) => handleRowChange(row.id, 'od_spherical', formatDiopterOnBlur(e.target.value, { allowNegative: true }))}
                                   placeholder="0.00"
                                   style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
                                 />
@@ -994,10 +1014,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                               <div>
                                 <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Cilíndrico</span>
                                 <input
-                                  type="number"
-                                  step="0.25"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={row.od_cylindrical}
-                                  onChange={(e) => handleRowChange(row.id, 'od_cylindrical', parseFloat(e.target.value) || 0)}
+                                  onChange={(e) => handleRowChange(row.id, 'od_cylindrical', sanitizeDiopterInput(e.target.value, true))}
+                                  onBlur={(e) => handleRowChange(row.id, 'od_cylindrical', formatDiopterOnBlur(e.target.value, { allowNegative: true }))}
                                   placeholder="0.00"
                                   style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
                                 />
@@ -1006,12 +1027,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                               <div>
                                 <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Eixo (°)</span>
                                 <input
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  max="180"
+                                  type="text"
+                                  inputMode="numeric"
                                   value={row.od_axis}
-                                  onChange={(e) => handleRowChange(row.id, 'od_axis', parseInt(e.target.value) || 0)}
+                                  onChange={(e) => handleRowChange(row.id, 'od_axis', e.target.value.replace(/[^0-9]/g, ''))}
+                                  onBlur={(e) => handleRowChange(row.id, 'od_axis', String(Math.min(180, Math.max(0, parseInt(e.target.value, 10) || 0))))}
                                   placeholder="0"
                                   style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
                                 />
@@ -1021,10 +1041,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                                 <div>
                                   <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#d97706', display: 'block', marginBottom: '2px' }}>Adição *</span>
                                   <input
-                                    type="number"
-                                    step="0.25"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={row.od_addition}
-                                    onChange={(e) => handleRowChange(row.id, 'od_addition', parseFloat(e.target.value) || 0)}
+                                    onChange={(e) => handleRowChange(row.id, 'od_addition', sanitizeDiopterInput(e.target.value, false))}
+                                    onBlur={(e) => handleRowChange(row.id, 'od_addition', formatDiopterOnBlur(e.target.value, { allowNegative: false }))}
                                     placeholder="0.00"
                                     style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.8rem', fontWeight: 800, color: '#b45309' }}
                                   />
@@ -1067,10 +1088,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                                 <div>
                                   <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '2px' }}>Base *</span>
                                   <input
-                                    type="number"
-                                    step="0.25"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={row.oe_base_curve}
-                                    onChange={(e) => handleRowChange(row.id, 'oe_base_curve', e.target.value)}
+                                    onChange={(e) => handleRowChange(row.id, 'oe_base_curve', sanitizeDiopterInput(e.target.value, false))}
+                                    onBlur={(e) => handleRowChange(row.id, 'oe_base_curve', formatDiopterOnBlur(e.target.value, { allowNegative: false, emptyIfBlank: true }))}
                                     placeholder="4.00"
                                     style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.8rem', fontWeight: 800, color: '#0369a1' }}
                                   />
@@ -1080,10 +1102,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                               <div>
                                 <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Esférico</span>
                                 <input
-                                  type="number"
-                                  step="0.25"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={row.oe_spherical}
-                                  onChange={(e) => handleRowChange(row.id, 'oe_spherical', parseFloat(e.target.value) || 0)}
+                                  onChange={(e) => handleRowChange(row.id, 'oe_spherical', sanitizeDiopterInput(e.target.value, true))}
+                                  onBlur={(e) => handleRowChange(row.id, 'oe_spherical', formatDiopterOnBlur(e.target.value, { allowNegative: true }))}
                                   placeholder="0.00"
                                   style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
                                 />
@@ -1092,10 +1115,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                               <div>
                                 <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Cilíndrico</span>
                                 <input
-                                  type="number"
-                                  step="0.25"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={row.oe_cylindrical}
-                                  onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', parseFloat(e.target.value) || 0)}
+                                  onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', sanitizeDiopterInput(e.target.value, true))}
+                                  onBlur={(e) => handleRowChange(row.id, 'oe_cylindrical', formatDiopterOnBlur(e.target.value, { allowNegative: true }))}
                                   placeholder="0.00"
                                   style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
                                 />
@@ -1104,12 +1128,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                               <div>
                                 <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Eixo (°)</span>
                                 <input
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  max="180"
+                                  type="text"
+                                  inputMode="numeric"
                                   value={row.oe_axis}
-                                  onChange={(e) => handleRowChange(row.id, 'oe_axis', parseInt(e.target.value) || 0)}
+                                  onChange={(e) => handleRowChange(row.id, 'oe_axis', e.target.value.replace(/[^0-9]/g, ''))}
+                                  onBlur={(e) => handleRowChange(row.id, 'oe_axis', String(Math.min(180, Math.max(0, parseInt(e.target.value, 10) || 0))))}
                                   placeholder="0"
                                   style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
                                 />
@@ -1119,10 +1142,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                                 <div>
                                   <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#d97706', display: 'block', marginBottom: '2px' }}>Adição *</span>
                                   <input
-                                    type="number"
-                                    step="0.25"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={row.oe_addition}
-                                    onChange={(e) => handleRowChange(row.id, 'oe_addition', parseFloat(e.target.value) || 0)}
+                                    onChange={(e) => handleRowChange(row.id, 'oe_addition', sanitizeDiopterInput(e.target.value, false))}
+                                    onBlur={(e) => handleRowChange(row.id, 'oe_addition', formatDiopterOnBlur(e.target.value, { allowNegative: false }))}
                                     placeholder="0.00"
                                     style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.8rem', fontWeight: 800, color: '#b45309' }}
                                   />
