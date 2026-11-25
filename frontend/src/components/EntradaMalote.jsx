@@ -6,11 +6,17 @@ import {
 import api, { LensService } from '../services/api';
 
 const MATRIX_OPTIONS = [
-  { value: 'LP_GRADE', label: 'Visão Simples', basePrice: 67.0 },
-  { value: 'GRADE_167', label: '1.67', basePrice: 110.0 },
-  { value: 'MF_ACB', label: 'Multifocal Acabado', basePrice: 85.0 },
-  { value: 'MF_BLOCO', label: 'Multifocal', basePrice: 95.0 },
-  { value: 'BLOCO_VS', label: 'Bloco Visão Simples', basePrice: 75.0 },
+  { value: 'LP_GRADE', label: 'Visão Simples', unitPrice: 33.5 },
+  { value: 'GRADE_167', label: '1.67', unitPrice: 55.0 },
+  { value: 'MF_ACB', label: 'Multifocal Acabado', unitPrice: 42.5 },
+  { value: 'MF_BLOCO', label: 'Multifocal', unitPrice: 47.5 },
+  { value: 'BLOCO_VS', label: 'Bloco Visão Simples', unitPrice: 37.5 },
+];
+
+const EYE_TARGET_OPTIONS = [
+  { value: 'OD_OE', label: 'Ambos (Par)', short: 'OD + OE' },
+  { value: 'OD', label: 'Direito (OD)', short: 'OD' },
+  { value: 'OE', label: 'Esquerdo (OE)', short: 'OE' },
 ];
 
 const SERVICE_OPTIONS = [
@@ -32,24 +38,28 @@ const TREATMENT_OPTIONS = [
 const createEmptyRow = (index = 1) => ({
   id: Date.now() + Math.random(),
   client_order_number: '',
-  client_name: '',
   tray_number: String(index).padStart(2, '0'),
   matrix_type: 'LP_GRADE',
   lens_model_id: '',
+  eye_target: 'OD_OE',
   od_spherical: 0.0,
   od_cylindrical: 0.0,
   od_axis: 0,
   od_addition: 0.0,
+  od_base_curve: '',
   oe_spherical: 0.0,
   oe_cylindrical: 0.0,
   oe_axis: 0,
   oe_addition: 0.0,
+  oe_base_curve: '',
   service_type: 'Montagem Padrão',
   treatment: 'Filtro Azul AR',
+  lens_unit_price: 33.5,
   lens_price: 67.0,
   service_price: 13.0,
   treatment_price: 0.0,
   total_amount: 80.0,
+  is_manual_total: false,
   special_instructions: ''
 });
 
@@ -111,14 +121,17 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
           const matching = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (r.matrix_type || 'LP_GRADE').trim().toUpperCase());
           if (matching.length > 0) {
             const first = matching[0];
-            const lPrice = parseFloat(first.sale_price || r.lens_price || 67.0);
+            const unitPrice = parseFloat(first.sale_price || r.lens_unit_price || 33.5);
+            const qty = (r.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1;
+            const lPrice = Math.round(unitPrice * qty * 100) / 100;
             const sPrice = parseFloat(r.service_price || 0.0);
             const tPrice = parseFloat(r.treatment_price || 0.0);
             return {
               ...r,
               lens_model_id: first.id,
+              lens_unit_price: unitPrice,
               lens_price: lPrice,
-              total_amount: Math.round((lPrice + sPrice + tPrice) * 100) / 100
+              total_amount: r.is_manual_total ? r.total_amount : Math.round((lPrice + sPrice + tPrice) * 100) / 100
             };
           }
         }
@@ -127,17 +140,26 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     }
   }, [lensModels]);
 
-  // Recalcula valor de uma linha
+  // Recalcula valor de uma linha (preservando edição manual de Valor Total / desconto)
   const handleRowChange = (id, field, value) => {
     setRows(prevRows => prevRows.map(row => {
       if (row.id !== id) return row;
       const updated = { ...row, [field]: value };
 
-      // Se mudou a matriz, ajusta o modelo e o preço sugerido da lente
+      // Se o operador editou diretamente o Valor Total (desconto/acordo manual), respeita o valor digitado
+      if (field === 'total_amount') {
+        updated.total_amount = value;
+        updated.is_manual_total = true;
+        return updated;
+      }
+
+      const pricingFields = ['matrix_type', 'lens_model_id', 'eye_target', 'service_type', 'treatment'];
+
+      // Se mudou a matriz, ajusta o modelo e o preço unitário sugerido da lente
       if (field === 'matrix_type') {
         const mat = MATRIX_OPTIONS.find(m => m.value === value);
         if (mat) {
-          updated.lens_price = mat.basePrice;
+          updated.lens_unit_price = mat.unitPrice;
         }
 
         // Filtra modelos disponíveis na matriz selecionada
@@ -147,7 +169,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
           if (!currentValid) {
             updated.lens_model_id = matchingModels[0].id;
             if (matchingModels[0].sale_price) {
-              updated.lens_price = parseFloat(matchingModels[0].sale_price);
+              updated.lens_unit_price = parseFloat(matchingModels[0].sale_price);
             }
           }
         } else {
@@ -158,10 +180,8 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
       // Se mudou o modelo de lente específico na matriz
       if (field === 'lens_model_id') {
         const selectedM = lensModels.find(m => m.id === value);
-        if (selectedM) {
-          if (selectedM.sale_price) {
-            updated.lens_price = parseFloat(selectedM.sale_price);
-          }
+        if (selectedM && selectedM.sale_price) {
+          updated.lens_unit_price = parseFloat(selectedM.sale_price);
         }
       }
 
@@ -181,11 +201,17 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         }
       }
 
-      // Recalcula total da linha
-      const lPrice = parseFloat(updated.lens_price || 0);
-      const sPrice = parseFloat(updated.service_price || 0);
-      const tPrice = parseFloat(updated.treatment_price || 0);
-      updated.total_amount = Math.round((lPrice + sPrice + tPrice) * 100) / 100;
+      // Recalcula automaticamente o valor do par (2x) ou olho único (1x) + serviço + tratamento
+      if (pricingFields.includes(field)) {
+        const qty = (updated.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1;
+        const unitPrice = parseFloat(updated.lens_unit_price || 0);
+        const lPrice = Math.round(unitPrice * qty * 100) / 100;
+        const sPrice = parseFloat(updated.service_price || 0);
+        const tPrice = parseFloat(updated.treatment_price || 0);
+        updated.lens_price = lPrice;
+        updated.total_amount = Math.round((lPrice + sPrice + tPrice) * 100) / 100;
+        updated.is_manual_total = false;
+      }
 
       return updated;
     }));
@@ -193,7 +219,20 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
   // Adiciona nova linha
   const handleAddRow = () => {
-    setRows(prev => [...prev, createEmptyRow(prev.length + 1)]);
+    setRows(prev => {
+      const nextRow = createEmptyRow(prev.length + 1);
+      const matching = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === 'LP_GRADE');
+      if (matching.length > 0) {
+        const first = matching[0];
+        const unitPrice = parseFloat(first.sale_price || nextRow.lens_unit_price || 33.5);
+        const lPrice = Math.round(unitPrice * 2 * 100) / 100;
+        nextRow.lens_model_id = first.id;
+        nextRow.lens_unit_price = unitPrice;
+        nextRow.lens_price = lPrice;
+        nextRow.total_amount = Math.round((lPrice + nextRow.service_price + nextRow.treatment_price) * 100) / 100;
+      }
+      return [...prev, nextRow];
+    });
   };
 
   // Duplica linha existente
@@ -202,7 +241,6 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
       ...rowToClone,
       id: Date.now() + Math.random(),
       client_order_number: '',
-      client_name: '',
       tray_number: String(rows.length + 1).padStart(2, '0')
     };
     setRows(prev => [...prev, clone]);
@@ -219,7 +257,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
   // Totais consolidados do malote
   const totalOrders = rows.length;
-  const totalLenses = totalOrders * 2;
+  const totalLenses = rows.reduce((acc, r) => acc + ((r.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1), 0);
   const totalBatchPrice = rows.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
 
   // Envio do Lote
@@ -246,18 +284,21 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         auto_deduct_inventory: autoDeductInventory,
         items: rows.map(r => ({
           client_order_number: r.client_order_number?.trim() || null,
-          client_name: r.client_name?.trim() || "Consumidor Final",
+          client_name: "Consumidor Final",
           tray_number: r.tray_number?.trim() || null,
           matrix_type: r.matrix_type,
           lens_model_id: r.lens_model_id || null,
+          eye_target: r.eye_target || 'OD_OE',
           od_spherical: parseFloat(r.od_spherical) || 0.0,
           od_cylindrical: parseFloat(r.od_cylindrical) || 0.0,
           od_axis: parseInt(r.od_axis) || 0,
           od_addition: parseFloat(r.od_addition) || 0.0,
+          od_base_curve: parseFloat(r.od_base_curve) || 0.0,
           oe_spherical: parseFloat(r.oe_spherical) || 0.0,
           oe_cylindrical: parseFloat(r.oe_cylindrical) || 0.0,
           oe_axis: parseInt(r.oe_axis) || 0,
           oe_addition: parseFloat(r.oe_addition) || 0.0,
+          oe_base_curve: parseFloat(r.oe_base_curve) || 0.0,
           service_type: r.service_type,
           treatment: r.treatment,
           lens_price: parseFloat(r.lens_price) || 0.0,
@@ -528,7 +569,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   onChange={(e) => setAutoDeductInventory(e.target.checked)}
                   style={{ accentColor: '#10b981', transform: 'scale(1.2)' }}
                 />
-                Dar Baixa Automática no Estoque (OD e OE)
+                Dar Baixa Automática no Estoque (OD / OE)
               </label>
             </div>
 
@@ -558,6 +599,12 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
           {rows.map((row, idx) => {
             const isMF = row.matrix_type === 'MF_ACB' || row.matrix_type === 'MF_BLOCO';
+            const isBlocoVS = row.matrix_type === 'BLOCO_VS';
+            const needsBaseCurve = isBlocoVS || isMF;
+            const needsAddition = isMF;
+            const eyeTarget = row.eye_target || 'OD_OE';
+            const showOD = eyeTarget === 'OD_OE' || eyeTarget === 'OD';
+            const showOE = eyeTarget === 'OD_OE' || eyeTarget === 'OE';
             const modelsInMatrix = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (row.matrix_type || 'LP_GRADE').trim().toUpperCase());
 
             return (
@@ -576,13 +623,13 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 {/* Linha 1: Dados Comerciais do Pedido e Tipo de Lente */}
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'minmax(38px, 46px) minmax(105px, 0.9fr) minmax(125px, 1fr) minmax(135px, 1.1fr) minmax(175px, 1.5fr) minmax(135px, 1fr) minmax(125px, 0.9fr) minmax(105px, 0.8fr) minmax(78px, 86px)',
+                  gridTemplateColumns: 'minmax(42px, 50px) minmax(110px, 0.9fr) minmax(145px, 1.1fr) minmax(210px, 1.8fr) minmax(140px, 1fr) minmax(135px, 1fr) minmax(120px, 0.9fr) minmax(82px, 88px)',
                   gap: '10px',
                   alignItems: 'end',
-                  minWidth: '1020px'
+                  minWidth: '980px'
                 }}>
                   
-                  {/* Badge # */}
+                  {/* Badge 01, 02... */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', marginBottom: '5px', textAlign: 'center' }}>Item</label>
                     <div style={{
@@ -594,9 +641,10 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                       background: 'rgba(15, 23, 42, 0.05)',
                       fontWeight: 800,
                       fontSize: '0.9rem',
+                      fontFamily: 'monospace',
                       color: 'hsl(var(--primary))'
                     }}>
-                      #{idx + 1}
+                      {String(idx + 1).padStart(2, '0')}
                     </div>
                   </div>
 
@@ -623,27 +671,6 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                     />
                   </div>
 
-                  {/* Paciente / Cliente */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
-                      Paciente / Cliente
-                    </label>
-                    <input
-                      type="text"
-                      value={row.client_name}
-                      onChange={(e) => handleRowChange(row.id, 'client_name', e.target.value)}
-                      placeholder="Consumidor Final"
-                      style={{
-                        width: '100%',
-                        height: '38px',
-                        padding: '0 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.85rem'
-                      }}
-                    />
-                  </div>
-
                   {/* Grade Pertencente */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
@@ -660,7 +687,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                         border: '1px solid #cbd5e1',
                         fontWeight: 700,
                         fontSize: '0.85rem',
-                        background: row.matrix_type === 'GRADE_167' ? 'rgba(168, 85, 247, 0.08)' : row.matrix_type.startsWith('MF') ? 'rgba(245, 158, 11, 0.08)' : 'white',
+                        background: row.matrix_type === 'GRADE_167' ? 'rgba(168, 85, 247, 0.08)' : row.matrix_type.startsWith('MF') ? 'rgba(245, 158, 11, 0.08)' : isBlocoVS ? 'rgba(14, 165, 233, 0.08)' : 'white',
                         color: 'hsl(var(--text-primary))'
                       }}
                     >
@@ -702,11 +729,14 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                       ) : (
                         <>
                           <option value="">-- Selecione o Modelo --</option>
-                          {modelsInMatrix.map(m => (
-                            <option key={m.id} value={m.id}>
-                              {m.brand || m.name} — {m.treatment || 'Incolor'} | {m.material || 'Resina'} (n={m.refractive_index || '1.56'}) — R$ {parseFloat(m.sale_price || 0).toFixed(2)}
-                            </option>
-                          ))}
+                          {modelsInMatrix.map(m => {
+                            const unitP = parseFloat(m.sale_price || 0);
+                            return (
+                              <option key={m.id} value={m.id}>
+                                {m.brand || m.name} — {m.treatment || 'Incolor'} | {m.material || 'Resina'} (n={m.refractive_index || '1.56'}) — R$ {unitP.toFixed(2)}/un (Par: R$ {(unitP * 2).toFixed(2)})
+                              </option>
+                            );
+                          })}
                         </>
                       )}
                     </select>
@@ -744,18 +774,39 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                     </select>
                   </div>
 
-                  {/* Valor Total da OS */}
+                  {/* Valor Total da OS (Calculado por Par / Olho Único e Editável para Desconto) */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px', textAlign: 'right' }}>
-                      Valor Total
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', height: '38px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0 8px', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))' }}>
+                        Valor Total
+                      </label>
+                      {row.is_manual_total ? (
+                        <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '4px' }}>
+                          Desc/Manual
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#64748b' }}>
+                          {eyeTarget === 'OD_OE' ? 'Par' : '1 un'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      height: '38px',
+                      border: row.is_manual_total ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '0 8px',
+                      background: row.is_manual_total ? '#fffbeb' : 'white'
+                    }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginRight: '4px' }}>R$</span>
                       <input
                         type="number"
-                        step="0.50"
+                        step="0.01"
+                        min="0"
                         value={row.total_amount}
-                        onChange={(e) => handleRowChange(row.id, 'total_amount', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleRowChange(row.id, 'total_amount', e.target.value)}
+                        title="Valor calculado automaticamente (par ou olho único + serviço). Editável para aplicar desconto."
                         style={{
                           width: '100%',
                           border: 'none',
@@ -814,7 +865,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
                 </div>
 
-                {/* Linha 2: Faixa Técnica de Dioptrias (OD e OE com espaço amplo e claro) */}
+                {/* Linha 2: Seletor de Olho para Baixa + Faixa Técnica Dinâmica conforme a Grade */}
                 <div style={{
                   marginTop: '12px',
                   padding: '10px 16px',
@@ -823,148 +874,216 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   border: '1px solid #e2e8f0',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '24px',
+                  gap: '18px',
                   flexWrap: 'wrap'
                 }}>
-                  
-                  {/* Bloco OD (Olho Direito) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      background: 'rgba(59, 130, 246, 0.12)',
-                      color: '#2563eb'
-                    }}>
-                      OD
-                    </span>
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
-                        <input
-                          type="number"
-                          step="0.25"
-                          value={row.od_spherical}
-                          onChange={(e) => handleRowChange(row.id, 'od_spherical', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                        />
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
-                        <input
-                          type="number"
-                          step="0.25"
-                          value={row.od_cylindrical}
-                          onChange={(e) => handleRowChange(row.id, 'od_cylindrical', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                        />
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          max="180"
-                          value={row.od_axis}
-                          onChange={(e) => handleRowChange(row.id, 'od_axis', parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          style={{ width: '60px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                        />
-                      </div>
-
-                      {isMF && (
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', display: 'block' }}>Adição</span>
-                          <input
-                            type="number"
-                            step="0.25"
-                            value={row.od_addition}
-                            onChange={(e) => handleRowChange(row.id, 'od_addition', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 700 }}
-                          />
-                        </div>
-                      )}
+                  {/* Seletor de Olho para Baixa (Ambos / OD / OE) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Baixa / Olho</span>
+                    <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
+                      {EYE_TARGET_OPTIONS.map(opt => {
+                        const active = eyeTarget === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleRowChange(row.id, 'eye_target', opt.value)}
+                            style={{
+                              padding: '4px 9px',
+                              borderRadius: '5px',
+                              border: 'none',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.12s ease',
+                              background: active ? 'hsl(var(--primary))' : 'transparent',
+                              color: active ? 'white' : '#475569',
+                              boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Separador Vertical */}
-                  <div style={{ width: '1px', height: '32px', background: '#cbd5e1' }} />
+                  <div style={{ width: '1px', height: '36px', background: '#cbd5e1' }} />
+                  
+                  {/* Bloco OD (Olho Direito) */}
+                  {showOD && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        color: '#2563eb'
+                      }}>
+                        OD
+                      </span>
 
-                  {/* Bloco OE (Olho Esquerdo) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      background: 'rgba(147, 51, 234, 0.12)',
-                      color: '#7e22ce'
-                    }}>
-                      OE
-                    </span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {needsBaseCurve && (
+                          <div>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block' }}>Base *</span>
+                            <input
+                              type="number"
+                              step="0.25"
+                              value={row.od_base_curve}
+                              onChange={(e) => handleRowChange(row.id, 'od_base_curve', e.target.value)}
+                              placeholder="Ex: 4.00"
+                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.82rem', fontWeight: 800, color: '#0369a1' }}
+                            />
+                          </div>
+                        )}
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
-                        <input
-                          type="number"
-                          step="0.25"
-                          value={row.oe_spherical}
-                          onChange={(e) => handleRowChange(row.id, 'oe_spherical', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                        />
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
-                        <input
-                          type="number"
-                          step="0.25"
-                          value={row.oe_cylindrical}
-                          onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                        />
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          max="180"
-                          value={row.oe_axis}
-                          onChange={(e) => handleRowChange(row.id, 'oe_axis', parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          style={{ width: '60px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                        />
-                      </div>
-
-                      {isMF && (
                         <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', display: 'block' }}>Adição</span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
                           <input
                             type="number"
                             step="0.25"
-                            value={row.oe_addition}
-                            onChange={(e) => handleRowChange(row.id, 'oe_addition', parseFloat(e.target.value) || 0)}
+                            value={row.od_spherical}
+                            onChange={(e) => handleRowChange(row.id, 'od_spherical', parseFloat(e.target.value) || 0)}
                             placeholder="0.00"
-                            style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 700 }}
+                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                           />
                         </div>
-                      )}
+
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
+                          <input
+                            type="number"
+                            step="0.25"
+                            value={row.od_cylindrical}
+                            onChange={(e) => handleRowChange(row.id, 'od_cylindrical', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
+                          />
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="180"
+                            value={row.od_axis}
+                            onChange={(e) => handleRowChange(row.id, 'od_axis', parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                            style={{ width: '58px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
+                          />
+                        </div>
+
+                        {needsAddition && (
+                          <div>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#d97706', display: 'block' }}>Adição *</span>
+                            <input
+                              type="number"
+                              step="0.25"
+                              value={row.od_addition}
+                              onChange={(e) => handleRowChange(row.id, 'od_addition', parseFloat(e.target.value) || 0)}
+                              placeholder="0.00"
+                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 800, color: '#b45309' }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Separador Vertical (somente quando ambos os olhos estão visíveis) */}
+                  {showOD && showOE && (
+                    <div style={{ width: '1px', height: '36px', background: '#cbd5e1' }} />
+                  )}
+
+                  {/* Bloco OE (Olho Esquerdo) */}
+                  {showOE && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        background: 'rgba(147, 51, 234, 0.12)',
+                        color: '#7e22ce'
+                      }}>
+                        OE
+                      </span>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {needsBaseCurve && (
+                          <div>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block' }}>Base *</span>
+                            <input
+                              type="number"
+                              step="0.25"
+                              value={row.oe_base_curve}
+                              onChange={(e) => handleRowChange(row.id, 'oe_base_curve', e.target.value)}
+                              placeholder="Ex: 4.00"
+                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.82rem', fontWeight: 800, color: '#0369a1' }}
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
+                          <input
+                            type="number"
+                            step="0.25"
+                            value={row.oe_spherical}
+                            onChange={(e) => handleRowChange(row.id, 'oe_spherical', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
+                          />
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
+                          <input
+                            type="number"
+                            step="0.25"
+                            value={row.oe_cylindrical}
+                            onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
+                          />
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="180"
+                            value={row.oe_axis}
+                            onChange={(e) => handleRowChange(row.id, 'oe_axis', parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                            style={{ width: '58px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
+                          />
+                        </div>
+
+                        {needsAddition && (
+                          <div>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#d97706', display: 'block' }}>Adição *</span>
+                            <input
+                              type="number"
+                              step="0.25"
+                              value={row.oe_addition}
+                              onChange={(e) => handleRowChange(row.id, 'oe_addition', parseFloat(e.target.value) || 0)}
+                              placeholder="0.00"
+                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 800, color: '#b45309' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                 </div>
 
@@ -1003,7 +1122,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 <span style={{ color: '#64748b' }}>Pedidos:</span> <strong>{totalOrders} óculos</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b' }}>Lentes:</span> <strong>{totalLenses} un (OD/OE)</strong>
+                <span style={{ color: '#64748b' }}>Lentes:</span> <strong>{totalLenses} un</strong>
               </div>
               <div>
                 <span style={{ color: '#64748b' }}>Total do Malote:</span> <strong style={{ color: 'hsl(var(--primary))', fontSize: '1.2rem', marginLeft: '4px' }}>R$ {totalBatchPrice.toFixed(2)}</strong>

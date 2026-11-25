@@ -86,20 +86,41 @@ class OSBatchService:
             if not chosen_model:
                 chosen_model = models_by_matrix.get(mt_key) or (available_models[0] if available_models else None)
 
-            # Cálculo de preços
+            # Alvo da baixa (Ambos os olhos / Somente OD / Somente OE)
+            eye_target = (item_in.eye_target or "OD_OE").strip().upper()
+            if eye_target not in ("OD_OE", "OD", "OE"):
+                eye_target = "OD_OE"
+            has_od = eye_target in ("OD_OE", "OD")
+            has_oe = eye_target in ("OD_OE", "OE")
+            lens_qty = 2 if eye_target == "OD_OE" else 1
+
+            # Cálculo de preços (sale_price é unitário; par = 2x, olho único = 1x)
             base_lens_price = item_in.lens_price
             if base_lens_price is None or base_lens_price < 0:
-                base_lens_price = float(chosen_model.sale_price) if chosen_model and chosen_model.sale_price else DEFAULT_GRADE_PRICES.get(mt_key, 67.0)
+                unit_p = float(chosen_model.sale_price) if chosen_model and chosen_model.sale_price else (DEFAULT_GRADE_PRICES.get(mt_key, 67.0) / 2.0)
+                base_lens_price = round(unit_p * lens_qty, 2)
 
             serv_price = float(item_in.service_price or 0.0)
             treat_price = float(item_in.treatment_price or 0.0)
+            calculated_total = round(base_lens_price + serv_price + treat_price, 2)
 
-            if item_in.total_amount is not None and item_in.total_amount > 0:
-                os_total = float(item_in.total_amount)
+            if item_in.total_amount is not None and item_in.total_amount >= 0:
+                os_total = round(float(item_in.total_amount), 2)
             else:
-                os_total = base_lens_price + serv_price + treat_price
+                os_total = calculated_total
 
+            is_custom_price = abs(os_total - calculated_total) > 0.01
             total_batch_amount += os_total
+
+            eye_label_map = {
+                "OD_OE": "Ambos os Olhos (OD + OE)",
+                "OD": "Somente Olho Direito (OD)",
+                "OE": "Somente Olho Esquerdo (OE)",
+            }
+            eye_tag = f"[Baixa: {eye_label_map[eye_target]} | Qtd: {lens_qty} un]"
+            instructions = item_in.special_instructions or f"Entrada Lote Malote: {batch_ref}"
+            if eye_tag not in instructions:
+                instructions = f"{instructions} {eye_tag}"
 
             # 2. Criação da Ordem de Serviço
             new_os = ServiceOrder(
@@ -115,20 +136,22 @@ class OSBatchService:
                 service_type=item_in.service_type or "Montagem Padrão",
                 lens_model_id=chosen_model.id if chosen_model else None,
                 
-                # Dioptrias OD
-                od_spherical=Decimal(str(round(item_in.od_spherical, 2))),
-                od_cylindrical=Decimal(str(round(item_in.od_cylindrical, 2))),
-                od_axis=int(item_in.od_axis or 0),
-                od_addition=Decimal(str(round(item_in.od_addition, 2))) if item_in.od_addition else Decimal("0.0"),
+                # Dioptrias OD (somente quando OD faz parte do pedido)
+                od_spherical=Decimal(str(round(item_in.od_spherical, 2))) if has_od else None,
+                od_cylindrical=Decimal(str(round(item_in.od_cylindrical, 2))) if has_od else None,
+                od_axis=int(item_in.od_axis or 0) if has_od else None,
+                od_addition=(Decimal(str(round(item_in.od_addition, 2))) if item_in.od_addition else Decimal("0.0")) if has_od else None,
                 
-                # Dioptrias OE
-                oe_spherical=Decimal(str(round(item_in.oe_spherical, 2))),
-                oe_cylindrical=Decimal(str(round(item_in.oe_cylindrical, 2))),
-                oe_axis=int(item_in.oe_axis or 0),
-                oe_addition=Decimal(str(round(item_in.oe_addition, 2))) if item_in.oe_addition else Decimal("0.0"),
+                # Dioptrias OE (somente quando OE faz parte do pedido)
+                oe_spherical=Decimal(str(round(item_in.oe_spherical, 2))) if has_oe else None,
+                oe_cylindrical=Decimal(str(round(item_in.oe_cylindrical, 2))) if has_oe else None,
+                oe_axis=int(item_in.oe_axis or 0) if has_oe else None,
+                oe_addition=(Decimal(str(round(item_in.oe_addition, 2))) if item_in.oe_addition else Decimal("0.0")) if has_oe else None,
 
+                custom_price_applied=is_custom_price,
+                price_override_reason="Desconto / Ajuste manual na Entrada por Malote" if is_custom_price else None,
                 total_amount=Decimal(str(round(os_total, 2))),
-                special_instructions=item_in.special_instructions or f"Entrada Lote Malote: {batch_ref}",
+                special_instructions=instructions,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc)
             )
@@ -136,25 +159,26 @@ class OSBatchService:
             db.add(new_os)
             await db.flush()
 
-            # 3. Baixa Automática de Estoque (se solicitada)
+            # 3. Baixa Automática de Estoque (se solicitada) respeitando eye_target (OD_OE, OD ou OE)
             deducted = False
             inv_warning = None
 
             if payload.auto_deduct_inventory and chosen_model:
-                rx_data_prepared = {
-                    "OD": {
+                rx_data_prepared: Dict[str, Any] = {}
+                if has_od:
+                    rx_data_prepared["OD"] = {
                         "esferico": item_in.od_spherical,
                         "cilindrico": item_in.od_cylindrical,
                         "adicao": item_in.od_addition,
                         "curva_base": item_in.od_base_curve
-                    },
-                    "OE": {
+                    }
+                if has_oe:
+                    rx_data_prepared["OE"] = {
                         "esferico": item_in.oe_spherical,
                         "cilindrico": item_in.oe_cylindrical,
                         "adicao": item_in.oe_addition,
                         "curva_base": item_in.oe_base_curve
                     }
-                }
                 try:
                     await allocate_and_deduct_inventory(
                         db=db,
@@ -169,16 +193,16 @@ class OSBatchService:
             # 4. Gravação dos itens da OS para faturamento e Anexo 1
             # Item da Lente
             if chosen_model and base_lens_price > 0:
-                unit_lens_p = round(base_lens_price / 2.0, 2)
+                unit_lens_p = round(base_lens_price / float(lens_qty), 2)
                 db.add(ServiceOrderItem(
                     id=uuid.uuid4(),
                     service_order_id=new_os.id,
                     entity_type="product",
                     entity_id=chosen_model.id,
-                    quantity=2,
+                    quantity=lens_qty,
                     unit_price=Decimal(str(unit_lens_p)),
                     total_price=Decimal(str(base_lens_price)),
-                    custom_price_applied=False,
+                    custom_price_applied=is_custom_price,
                     created_at=datetime.now(timezone.utc)
                 ))
 
@@ -213,7 +237,7 @@ class OSBatchService:
             # 5. Histórico do Workflow
             note = f"Entrada em Lote / Malote ({batch_ref})."
             if deducted:
-                note += " Baixa de estoque de lentes (OD e OE) realizada com sucesso."
+                note += f" Baixa de estoque de lentes ({eye_label_map[eye_target]}) realizada com sucesso."
             elif inv_warning:
                 note += f" Alerta de estoque: {inv_warning}"
 
