@@ -28,13 +28,6 @@ const SERVICE_OPTIONS = [
   { value: 'Sem Montagem (Apenas Lentes)', label: 'Sem Montagem', price: 0.0 },
 ];
 
-const TREATMENT_OPTIONS = [
-  { value: 'Incolor / Sem Tratamento', label: 'Incolor (Sem Tratamento)', price: 0.0 },
-  { value: 'Filtro Azul AR', label: 'Filtro Azul AR', price: 0.0 },
-  { value: 'Antirreflexo Premium', label: 'Antirreflexo Premium', price: 0.0 },
-  { value: 'Fotossensível / Transitions', label: 'Fotossensível', price: 25.0 },
-];
-
 const createEmptyRow = (index = 1) => ({
   id: Date.now() + Math.random(),
   client_order_number: '',
@@ -42,6 +35,7 @@ const createEmptyRow = (index = 1) => ({
   matrix_type: 'LP_GRADE',
   lens_model_id: '',
   eye_target: 'OD_OE',
+  has_prescription: true,
   od_spherical: 0.0,
   od_cylindrical: 0.0,
   od_axis: 0,
@@ -53,7 +47,7 @@ const createEmptyRow = (index = 1) => ({
   oe_addition: 0.0,
   oe_base_curve: '',
   service_type: 'Montagem Padrão',
-  treatment: 'Filtro Azul AR',
+  treatment: 'Incolor / Sem Tratamento',
   lens_unit_price: 33.5,
   lens_price: 67.0,
   service_price: 13.0,
@@ -73,7 +67,6 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     const dateStr = d.toISOString().slice(0, 10).replace(/-/g, '');
     return `MALOTE-${dateStr}`;
   });
-  const [autoDeductInventory, setAutoDeductInventory] = useState(true);
   const [loadingStores, setLoadingStores] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -153,10 +146,15 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         return updated;
       }
 
-      const pricingFields = ['matrix_type', 'lens_model_id', 'eye_target', 'service_type', 'treatment'];
+      const pricingFields = ['matrix_type', 'lens_model_id', 'eye_target', 'service_type'];
 
-      // Se mudou a matriz, ajusta o modelo e o preço unitário sugerido da lente
+      // Se mudou a matriz, ajusta o modelo, reseta olho para Par se não for multifocal e atualiza preço unitário
       if (field === 'matrix_type') {
+        const isMultifocalNext = value === 'MF_ACB' || value === 'MF_BLOCO';
+        if (!isMultifocalNext) {
+          updated.eye_target = 'OD_OE';
+        }
+
         const mat = MATRIX_OPTIONS.find(m => m.value === value);
         if (mat) {
           updated.lens_unit_price = mat.unitPrice;
@@ -171,6 +169,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             if (matchingModels[0].sale_price) {
               updated.lens_unit_price = parseFloat(matchingModels[0].sale_price);
             }
+            updated.treatment = matchingModels[0].treatment || 'Incolor / Sem Tratamento';
           }
         } else {
           updated.lens_model_id = '';
@@ -180,8 +179,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
       // Se mudou o modelo de lente específico na matriz
       if (field === 'lens_model_id') {
         const selectedM = lensModels.find(m => m.id === value);
-        if (selectedM && selectedM.sale_price) {
-          updated.lens_unit_price = parseFloat(selectedM.sale_price);
+        if (selectedM) {
+          if (selectedM.sale_price) {
+            updated.lens_unit_price = parseFloat(selectedM.sale_price);
+          }
+          updated.treatment = selectedM.treatment || 'Incolor / Sem Tratamento';
         }
       }
 
@@ -193,23 +195,15 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         }
       }
 
-      // Se mudou o tratamento, ajusta o preço do tratamento
-      if (field === 'treatment') {
-        const treat = TREATMENT_OPTIONS.find(t => t.value === value);
-        if (treat) {
-          updated.treatment_price = treat.price;
-        }
-      }
-
-      // Recalcula automaticamente o valor do par (2x) ou olho único (1x) + serviço + tratamento
+      // Recalcula automaticamente o valor do par (2x) ou olho único (1x) + serviço
       if (pricingFields.includes(field)) {
         const qty = (updated.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1;
         const unitPrice = parseFloat(updated.lens_unit_price || 0);
         const lPrice = Math.round(unitPrice * qty * 100) / 100;
         const sPrice = parseFloat(updated.service_price || 0);
-        const tPrice = parseFloat(updated.treatment_price || 0);
         updated.lens_price = lPrice;
-        updated.total_amount = Math.round((lPrice + sPrice + tPrice) * 100) / 100;
+        updated.treatment_price = 0.0;
+        updated.total_amount = Math.round((lPrice + sPrice) * 100) / 100;
         updated.is_manual_total = false;
       }
 
@@ -281,32 +275,37 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         optical_store_id: selectedStoreId,
         batch_reference: batchRef.trim() || undefined,
         initial_status: "EM_PRODUCAO",
-        auto_deduct_inventory: autoDeductInventory,
-        items: rows.map(r => ({
-          client_order_number: r.client_order_number?.trim() || null,
-          client_name: "Consumidor Final",
-          tray_number: r.tray_number?.trim() || null,
-          matrix_type: r.matrix_type,
-          lens_model_id: r.lens_model_id || null,
-          eye_target: r.eye_target || 'OD_OE',
-          od_spherical: parseFloat(r.od_spherical) || 0.0,
-          od_cylindrical: parseFloat(r.od_cylindrical) || 0.0,
-          od_axis: parseInt(r.od_axis) || 0,
-          od_addition: parseFloat(r.od_addition) || 0.0,
-          od_base_curve: parseFloat(r.od_base_curve) || 0.0,
-          oe_spherical: parseFloat(r.oe_spherical) || 0.0,
-          oe_cylindrical: parseFloat(r.oe_cylindrical) || 0.0,
-          oe_axis: parseInt(r.oe_axis) || 0,
-          oe_addition: parseFloat(r.oe_addition) || 0.0,
-          oe_base_curve: parseFloat(r.oe_base_curve) || 0.0,
-          service_type: r.service_type,
-          treatment: r.treatment,
-          lens_price: parseFloat(r.lens_price) || 0.0,
-          service_price: parseFloat(r.service_price) || 0.0,
-          treatment_price: parseFloat(r.treatment_price) || 0.0,
-          total_amount: parseFloat(r.total_amount) || 0.0,
-          special_instructions: r.special_instructions?.trim() || null
-        }))
+        auto_deduct_inventory: true,
+        items: rows.map(r => {
+          const isMultifocalRow = r.matrix_type === 'MF_ACB' || r.matrix_type === 'MF_BLOCO';
+          const selectedModel = lensModels.find(m => m.id === r.lens_model_id);
+          return {
+            client_order_number: r.client_order_number?.trim() || null,
+            client_name: "Consumidor Final",
+            tray_number: r.tray_number?.trim() || null,
+            matrix_type: r.matrix_type,
+            lens_model_id: r.lens_model_id || null,
+            eye_target: isMultifocalRow ? (r.eye_target || 'OD_OE') : 'OD_OE',
+            has_prescription: r.has_prescription !== false,
+            od_spherical: parseFloat(r.od_spherical) || 0.0,
+            od_cylindrical: parseFloat(r.od_cylindrical) || 0.0,
+            od_axis: parseInt(r.od_axis) || 0,
+            od_addition: parseFloat(r.od_addition) || 0.0,
+            od_base_curve: parseFloat(r.od_base_curve) || 0.0,
+            oe_spherical: parseFloat(r.oe_spherical) || 0.0,
+            oe_cylindrical: parseFloat(r.oe_cylindrical) || 0.0,
+            oe_axis: parseInt(r.oe_axis) || 0,
+            oe_addition: parseFloat(r.oe_addition) || 0.0,
+            oe_base_curve: parseFloat(r.oe_base_curve) || 0.0,
+            service_type: r.service_type,
+            treatment: selectedModel?.treatment || r.treatment || 'Incolor / Sem Tratamento',
+            lens_price: parseFloat(r.lens_price) || 0.0,
+            service_price: parseFloat(r.service_price) || 0.0,
+            treatment_price: 0.0,
+            total_amount: parseFloat(r.total_amount) || 0.0,
+            special_instructions: r.special_instructions?.trim() || null
+          };
+        })
       };
 
       const res = await api.post('/os/batch-malote', payload);
@@ -409,8 +408,8 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>OS</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Pedido Loja</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>OS Lab</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Nº da OS</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Grade / Modelo</th>
                     <th style={{ padding: '8px 12px', textAlign: 'center' }}>Estoque</th>
                     <th style={{ padding: '8px 12px', textAlign: 'right' }}>Valor</th>
@@ -544,35 +543,6 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
               />
             </div>
 
-            {/* Baixa Automática de Estoque */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '6px' }}>
-                <Layers size={15} style={{ color: 'hsl(var(--primary))' }} />
-                Controle de Estoque
-              </label>
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '9px 14px',
-                borderRadius: '8px',
-                background: autoDeductInventory ? 'rgba(16, 185, 129, 0.08)' : '#f8fafc',
-                border: `1px solid ${autoDeductInventory ? '#10b981' : '#cbd5e1'}`,
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                color: autoDeductInventory ? '#047857' : '#475569'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={autoDeductInventory}
-                  onChange={(e) => setAutoDeductInventory(e.target.checked)}
-                  style={{ accentColor: '#10b981', transform: 'scale(1.2)' }}
-                />
-                Dar Baixa Automática no Estoque (OD / OE)
-              </label>
-            </div>
-
           </div>
         </div>
 
@@ -602,9 +572,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             const isBlocoVS = row.matrix_type === 'BLOCO_VS';
             const needsBaseCurve = isBlocoVS || isMF;
             const needsAddition = isMF;
-            const eyeTarget = row.eye_target || 'OD_OE';
+            const eyeTarget = isMF ? (row.eye_target || 'OD_OE') : 'OD_OE';
+            const hasPrescription = row.has_prescription !== false;
             const showOD = eyeTarget === 'OD_OE' || eyeTarget === 'OD';
             const showOE = eyeTarget === 'OD_OE' || eyeTarget === 'OE';
+            const fieldCount = 3 + (needsBaseCurve ? 1 : 0) + (needsAddition ? 1 : 0);
             const modelsInMatrix = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (row.matrix_type || 'LP_GRADE').trim().toUpperCase());
 
             return (
@@ -623,7 +595,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 {/* Linha 1: Dados Comerciais do Pedido e Tipo de Lente */}
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'minmax(42px, 50px) minmax(110px, 0.9fr) minmax(145px, 1.1fr) minmax(210px, 1.8fr) minmax(140px, 1fr) minmax(135px, 1fr) minmax(120px, 0.9fr) minmax(82px, 88px)',
+                  gridTemplateColumns: 'minmax(42px, 50px) minmax(110px, 0.85fr) minmax(145px, 1.1fr) minmax(220px, 1.9fr) minmax(140px, 1fr) minmax(160px, 1.05fr) minmax(118px, 0.85fr) minmax(82px, 88px)',
                   gap: '10px',
                   alignItems: 'end',
                   minWidth: '980px'
@@ -648,10 +620,10 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                     </div>
                   </div>
 
-                  {/* Pedido Loja */}
+                  {/* Nº da OS */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
-                      Pedido Loja
+                      Nº da OS
                     </label>
                     <input
                       type="text"
@@ -758,20 +730,54 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                     </select>
                   </div>
 
-                  {/* Tratamento */}
+                  {/* Receita (Com Receita / Sem Receita) */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
-                      Tratamento
+                      Receita
                     </label>
-                    <select
-                      value={row.treatment}
-                      onChange={(e) => handleRowChange(row.id, 'treatment', e.target.value)}
-                      style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
-                    >
-                      {TREATMENT_OPTIONS.map(t => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      height: '38px',
+                      background: '#f1f5f9',
+                      borderRadius: '8px',
+                      padding: '3px',
+                      border: '1px solid #cbd5e1',
+                      gap: '3px'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleRowChange(row.id, 'has_prescription', true)}
+                        style={{
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.12s ease',
+                          background: hasPrescription ? 'hsl(var(--primary))' : 'transparent',
+                          color: hasPrescription ? 'white' : '#475569'
+                        }}
+                      >
+                        Com Receita
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRowChange(row.id, 'has_prescription', false)}
+                        style={{
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.12s ease',
+                          background: !hasPrescription ? '#475569' : 'transparent',
+                          color: !hasPrescription ? 'white' : '#475569'
+                        }}
+                      >
+                        Sem Receita
+                      </button>
+                    </div>
                   </div>
 
                   {/* Valor Total da OS (Calculado por Par / Olho Único e Editável para Desconto) */}
@@ -865,227 +871,280 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
                 </div>
 
-                {/* Linha 2: Seletor de Olho para Baixa + Faixa Técnica Dinâmica conforme a Grade */}
-                <div style={{
-                  marginTop: '12px',
-                  padding: '10px 16px',
-                  background: '#f8fafc',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '18px',
-                  flexWrap: 'wrap'
-                }}>
+                {/* Linha 2: Seletor de Olho (somente Multifocal / MF Acabado) + Dioptrias OD/OE lado a lado (sem quebra) */}
+                {(isMF || hasPrescription) && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '12px 14px',
+                    background: '#f8fafc',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    minWidth: '980px'
+                  }}>
 
-                  {/* Seletor de Olho para Baixa (Ambos / OD / OE) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569' }}>Baixa / Olho</span>
-                    <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
-                      {EYE_TARGET_OPTIONS.map(opt => {
-                        const active = eyeTarget === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => handleRowChange(row.id, 'eye_target', opt.value)}
-                            style={{
-                              padding: '4px 9px',
-                              borderRadius: '5px',
-                              border: 'none',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              transition: 'all 0.12s ease',
-                              background: active ? 'hsl(var(--primary))' : 'transparent',
-                              color: active ? 'white' : '#475569',
-                              boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
-                            }}
-                          >
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {/* Barra superior de seleção de olho — exibida SOMENTE para Multifocal e Multifocal Acabado */}
+                    {isMF && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        paddingBottom: hasPrescription ? '8px' : '0',
+                        borderBottom: hasPrescription ? '1px dashed #cbd5e1' : 'none'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                            Seleção de Olho (Baixa):
+                          </span>
+                          <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
+                            {EYE_TARGET_OPTIONS.map(opt => {
+                              const active = eyeTarget === opt.value;
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => handleRowChange(row.id, 'eye_target', opt.value)}
+                                  style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '5px',
+                                    border: 'none',
+                                    fontSize: '0.73rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.12s ease',
+                                    background: active ? 'hsl(var(--primary))' : 'transparent',
+                                    color: active ? 'white' : '#475569',
+                                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
+                                  }}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {!hasPrescription && (
+                          <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#64748b', fontStyle: 'italic' }}>
+                            Pedido marcado como Sem Receita
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Grade Lado a Lado (OD à esquerda, OE à direita — nunca quebra para linha de baixo) */}
+                    {hasPrescription && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: (showOD && showOE) ? '1fr 1fr' : 'minmax(360px, 560px)',
+                        gap: '12px',
+                        alignItems: 'stretch'
+                      }}>
+
+                        {/* Bloco OD (Olho Direito) */}
+                        {showOD && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            background: 'white',
+                            border: '1px solid rgba(59, 130, 246, 0.28)',
+                            borderRadius: '8px',
+                            padding: '8px 10px'
+                          }}>
+                            <span style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              background: 'rgba(59, 130, 246, 0.12)',
+                              color: '#2563eb',
+                              flexShrink: 0
+                            }}>
+                              OD
+                            </span>
+
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: `repeat(${fieldCount}, minmax(0, 1fr))`,
+                              gap: '6px',
+                              flex: 1
+                            }}>
+                              {needsBaseCurve && (
+                                <div>
+                                  <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '2px' }}>Base *</span>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    value={row.od_base_curve}
+                                    onChange={(e) => handleRowChange(row.id, 'od_base_curve', e.target.value)}
+                                    placeholder="4.00"
+                                    style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.8rem', fontWeight: 800, color: '#0369a1' }}
+                                  />
+                                </div>
+                              )}
+
+                              <div>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Esférico</span>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  value={row.od_spherical}
+                                  onChange={(e) => handleRowChange(row.id, 'od_spherical', parseFloat(e.target.value) || 0)}
+                                  placeholder="0.00"
+                                  style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
+                                />
+                              </div>
+
+                              <div>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Cilíndrico</span>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  value={row.od_cylindrical}
+                                  onChange={(e) => handleRowChange(row.id, 'od_cylindrical', parseFloat(e.target.value) || 0)}
+                                  placeholder="0.00"
+                                  style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
+                                />
+                              </div>
+
+                              <div>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Eixo (°)</span>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  max="180"
+                                  value={row.od_axis}
+                                  onChange={(e) => handleRowChange(row.id, 'od_axis', parseInt(e.target.value) || 0)}
+                                  placeholder="0"
+                                  style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
+                                />
+                              </div>
+
+                              {needsAddition && (
+                                <div>
+                                  <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#d97706', display: 'block', marginBottom: '2px' }}>Adição *</span>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    value={row.od_addition}
+                                    onChange={(e) => handleRowChange(row.id, 'od_addition', parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.8rem', fontWeight: 800, color: '#b45309' }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bloco OE (Olho Esquerdo) */}
+                        {showOE && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            background: 'white',
+                            border: '1px solid rgba(147, 51, 234, 0.28)',
+                            borderRadius: '8px',
+                            padding: '8px 10px'
+                          }}>
+                            <span style={{
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              background: 'rgba(147, 51, 234, 0.12)',
+                              color: '#7e22ce',
+                              flexShrink: 0
+                            }}>
+                              OE
+                            </span>
+
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: `repeat(${fieldCount}, minmax(0, 1fr))`,
+                              gap: '6px',
+                              flex: 1
+                            }}>
+                              {needsBaseCurve && (
+                                <div>
+                                  <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '2px' }}>Base *</span>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    value={row.oe_base_curve}
+                                    onChange={(e) => handleRowChange(row.id, 'oe_base_curve', e.target.value)}
+                                    placeholder="4.00"
+                                    style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.8rem', fontWeight: 800, color: '#0369a1' }}
+                                  />
+                                </div>
+                              )}
+
+                              <div>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Esférico</span>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  value={row.oe_spherical}
+                                  onChange={(e) => handleRowChange(row.id, 'oe_spherical', parseFloat(e.target.value) || 0)}
+                                  placeholder="0.00"
+                                  style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
+                                />
+                              </div>
+
+                              <div>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Cilíndrico</span>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  value={row.oe_cylindrical}
+                                  onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', parseFloat(e.target.value) || 0)}
+                                  placeholder="0.00"
+                                  style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
+                                />
+                              </div>
+
+                              <div>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Eixo (°)</span>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  max="180"
+                                  value={row.oe_axis}
+                                  onChange={(e) => handleRowChange(row.id, 'oe_axis', parseInt(e.target.value) || 0)}
+                                  placeholder="0"
+                                  style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, background: 'white' }}
+                                />
+                              </div>
+
+                              {needsAddition && (
+                                <div>
+                                  <span style={{ fontSize: '0.67rem', fontWeight: 800, color: '#d97706', display: 'block', marginBottom: '2px' }}>Adição *</span>
+                                  <input
+                                    type="number"
+                                    step="0.25"
+                                    value={row.oe_addition}
+                                    onChange={(e) => handleRowChange(row.id, 'oe_addition', parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    style={{ width: '100%', padding: '4px 4px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.8rem', fontWeight: 800, color: '#b45309' }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    )}
+
                   </div>
-
-                  {/* Separador Vertical */}
-                  <div style={{ width: '1px', height: '36px', background: '#cbd5e1' }} />
-                  
-                  {/* Bloco OD (Olho Direito) */}
-                  {showOD && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        background: 'rgba(59, 130, 246, 0.12)',
-                        color: '#2563eb'
-                      }}>
-                        OD
-                      </span>
-
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {needsBaseCurve && (
-                          <div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block' }}>Base *</span>
-                            <input
-                              type="number"
-                              step="0.25"
-                              value={row.od_base_curve}
-                              onChange={(e) => handleRowChange(row.id, 'od_base_curve', e.target.value)}
-                              placeholder="Ex: 4.00"
-                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.82rem', fontWeight: 800, color: '#0369a1' }}
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
-                          <input
-                            type="number"
-                            step="0.25"
-                            value={row.od_spherical}
-                            onChange={(e) => handleRowChange(row.id, 'od_spherical', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                          />
-                        </div>
-
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
-                          <input
-                            type="number"
-                            step="0.25"
-                            value={row.od_cylindrical}
-                            onChange={(e) => handleRowChange(row.id, 'od_cylindrical', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                          />
-                        </div>
-
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            max="180"
-                            value={row.od_axis}
-                            onChange={(e) => handleRowChange(row.id, 'od_axis', parseInt(e.target.value) || 0)}
-                            placeholder="0"
-                            style={{ width: '58px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                          />
-                        </div>
-
-                        {needsAddition && (
-                          <div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#d97706', display: 'block' }}>Adição *</span>
-                            <input
-                              type="number"
-                              step="0.25"
-                              value={row.od_addition}
-                              onChange={(e) => handleRowChange(row.id, 'od_addition', parseFloat(e.target.value) || 0)}
-                              placeholder="0.00"
-                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 800, color: '#b45309' }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Separador Vertical (somente quando ambos os olhos estão visíveis) */}
-                  {showOD && showOE && (
-                    <div style={{ width: '1px', height: '36px', background: '#cbd5e1' }} />
-                  )}
-
-                  {/* Bloco OE (Olho Esquerdo) */}
-                  {showOE && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        background: 'rgba(147, 51, 234, 0.12)',
-                        color: '#7e22ce'
-                      }}>
-                        OE
-                      </span>
-
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {needsBaseCurve && (
-                          <div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block' }}>Base *</span>
-                            <input
-                              type="number"
-                              step="0.25"
-                              value={row.oe_base_curve}
-                              onChange={(e) => handleRowChange(row.id, 'oe_base_curve', e.target.value)}
-                              placeholder="Ex: 4.00"
-                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #0284c7', background: '#f0f9ff', fontSize: '0.82rem', fontWeight: 800, color: '#0369a1' }}
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
-                          <input
-                            type="number"
-                            step="0.25"
-                            value={row.oe_spherical}
-                            onChange={(e) => handleRowChange(row.id, 'oe_spherical', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                          />
-                        </div>
-
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
-                          <input
-                            type="number"
-                            step="0.25"
-                            value={row.oe_cylindrical}
-                            onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                          />
-                        </div>
-
-                        <div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            max="180"
-                            value={row.oe_axis}
-                            onChange={(e) => handleRowChange(row.id, 'oe_axis', parseInt(e.target.value) || 0)}
-                            placeholder="0"
-                            style={{ width: '58px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
-                          />
-                        </div>
-
-                        {needsAddition && (
-                          <div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#d97706', display: 'block' }}>Adição *</span>
-                            <input
-                              type="number"
-                              step="0.25"
-                              value={row.oe_addition}
-                              onChange={(e) => handleRowChange(row.id, 'oe_addition', parseFloat(e.target.value) || 0)}
-                              placeholder="0.00"
-                              style={{ width: '68px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1.5px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 800, color: '#b45309' }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
+                )}
 
               </div>
             );

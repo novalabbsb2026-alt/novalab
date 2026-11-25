@@ -9,6 +9,7 @@ class OSBatchItemSchema(BaseModel):
     matrix_type: str = Field("LP_GRADE", description="Grade: LP_GRADE, GRADE_167, MF_ACB, MF_BLOCO, BLOCO_VS")
     lens_model_id: Optional[uuid.UUID] = Field(None, description="Modelo específico de lente (opcional)")
     eye_target: str = Field("OD_OE", description="Alvo da baixa de estoque e produção: OD_OE (Ambos/Par), OD (Direito) ou OE (Esquerdo)")
+    has_prescription: bool = Field(True, description="Indica se o pedido possui receita médica informada")
 
     # Dioptrias Olho Direito (OD)
     od_spherical: float = Field(0.0, description="Grau esférico OD")

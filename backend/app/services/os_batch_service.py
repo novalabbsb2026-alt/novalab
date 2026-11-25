@@ -118,9 +118,12 @@ class OSBatchService:
                 "OE": "Somente Olho Esquerdo (OE)",
             }
             eye_tag = f"[Baixa: {eye_label_map[eye_target]} | Qtd: {lens_qty} un]"
+            rx_tag = "[Com Receita]" if item_in.has_prescription else "[Sem Receita]"
             instructions = item_in.special_instructions or f"Entrada Lote Malote: {batch_ref}"
             if eye_tag not in instructions:
                 instructions = f"{instructions} {eye_tag}"
+            if rx_tag not in instructions:
+                instructions = f"{instructions} {rx_tag}"
 
             # 2. Criação da Ordem de Serviço
             new_os = ServiceOrder(
@@ -136,17 +139,17 @@ class OSBatchService:
                 service_type=item_in.service_type or "Montagem Padrão",
                 lens_model_id=chosen_model.id if chosen_model else None,
                 
-                # Dioptrias OD (somente quando OD faz parte do pedido)
-                od_spherical=Decimal(str(round(item_in.od_spherical, 2))) if has_od else None,
-                od_cylindrical=Decimal(str(round(item_in.od_cylindrical, 2))) if has_od else None,
-                od_axis=int(item_in.od_axis or 0) if has_od else None,
-                od_addition=(Decimal(str(round(item_in.od_addition, 2))) if item_in.od_addition else Decimal("0.0")) if has_od else None,
+                # Dioptrias OD (somente quando OD faz parte do pedido e possui receita)
+                od_spherical=Decimal(str(round(item_in.od_spherical, 2))) if (has_od and item_in.has_prescription) else None,
+                od_cylindrical=Decimal(str(round(item_in.od_cylindrical, 2))) if (has_od and item_in.has_prescription) else None,
+                od_axis=int(item_in.od_axis or 0) if (has_od and item_in.has_prescription) else None,
+                od_addition=(Decimal(str(round(item_in.od_addition, 2))) if item_in.od_addition else Decimal("0.0")) if (has_od and item_in.has_prescription) else None,
                 
-                # Dioptrias OE (somente quando OE faz parte do pedido)
-                oe_spherical=Decimal(str(round(item_in.oe_spherical, 2))) if has_oe else None,
-                oe_cylindrical=Decimal(str(round(item_in.oe_cylindrical, 2))) if has_oe else None,
-                oe_axis=int(item_in.oe_axis or 0) if has_oe else None,
-                oe_addition=(Decimal(str(round(item_in.oe_addition, 2))) if item_in.oe_addition else Decimal("0.0")) if has_oe else None,
+                # Dioptrias OE (somente quando OE faz parte do pedido e possui receita)
+                oe_spherical=Decimal(str(round(item_in.oe_spherical, 2))) if (has_oe and item_in.has_prescription) else None,
+                oe_cylindrical=Decimal(str(round(item_in.oe_cylindrical, 2))) if (has_oe and item_in.has_prescription) else None,
+                oe_axis=int(item_in.oe_axis or 0) if (has_oe and item_in.has_prescription) else None,
+                oe_addition=(Decimal(str(round(item_in.oe_addition, 2))) if item_in.oe_addition else Decimal("0.0")) if (has_oe and item_in.has_prescription) else None,
 
                 custom_price_applied=is_custom_price,
                 price_override_reason="Desconto / Ajuste manual na Entrada por Malote" if is_custom_price else None,
