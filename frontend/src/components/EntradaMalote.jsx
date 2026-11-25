@@ -871,78 +871,70 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
                 </div>
 
-                {/* Linha 2: Seletor de Olho (somente Multifocal / MF Acabado) + Dioptrias OD/OE lado a lado (sem quebra) */}
-                {(isMF || hasPrescription) && (
-                  <div style={{
-                    marginTop: '12px',
-                    padding: '12px 14px',
-                    background: '#f8fafc',
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    minWidth: '980px'
-                  }}>
+                {/* Linha 2: Seletor de Olho (somente Multifocal / MF Acabado) + Dioptrias OD/OE lado a lado (sempre visíveis) */}
+                <div style={{
+                  marginTop: '12px',
+                  padding: '12px 14px',
+                  background: '#f8fafc',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  minWidth: '980px'
+                }}>
 
-                    {/* Barra superior de seleção de olho — exibida SOMENTE para Multifocal e Multifocal Acabado */}
-                    {isMF && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        paddingBottom: hasPrescription ? '8px' : '0',
-                        borderBottom: hasPrescription ? '1px dashed #cbd5e1' : 'none'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                            Seleção de Olho (Baixa):
-                          </span>
-                          <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
-                            {EYE_TARGET_OPTIONS.map(opt => {
-                              const active = eyeTarget === opt.value;
-                              return (
-                                <button
-                                  key={opt.value}
-                                  type="button"
-                                  onClick={() => handleRowChange(row.id, 'eye_target', opt.value)}
-                                  style={{
-                                    padding: '4px 10px',
-                                    borderRadius: '5px',
-                                    border: 'none',
-                                    fontSize: '0.73rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.12s ease',
-                                    background: active ? 'hsl(var(--primary))' : 'transparent',
-                                    color: active ? 'white' : '#475569',
-                                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
-                                  }}
-                                >
-                                  {opt.label}
-                                </button>
-                              );
-                            })}
-                          </div>
+                  {/* Barra superior de seleção de olho — exibida SOMENTE para Multifocal e Multifocal Acabado */}
+                  {isMF && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px dashed #cbd5e1'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                          Seleção de Olho (Baixa):
+                        </span>
+                        <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
+                          {EYE_TARGET_OPTIONS.map(opt => {
+                            const active = eyeTarget === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => handleRowChange(row.id, 'eye_target', opt.value)}
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '5px',
+                                  border: 'none',
+                                  fontSize: '0.73rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.12s ease',
+                                  background: active ? 'hsl(var(--primary))' : 'transparent',
+                                  color: active ? 'white' : '#475569',
+                                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
+                                }}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
                         </div>
-
-                        {!hasPrescription && (
-                          <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#64748b', fontStyle: 'italic' }}>
-                            Pedido marcado como Sem Receita
-                          </span>
-                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Grade Lado a Lado (OD à esquerda, OE à direita — nunca quebra para linha de baixo) */}
-                    {hasPrescription && (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: (showOD && showOE) ? '1fr 1fr' : 'minmax(360px, 560px)',
-                        gap: '12px',
-                        alignItems: 'stretch'
-                      }}>
+                  {/* Grade Lado a Lado (OD à esquerda, OE à direita — nunca quebra para linha de baixo) */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: (showOD && showOE) ? '1fr 1fr' : 'minmax(360px, 560px)',
+                    gap: '12px',
+                    alignItems: 'stretch'
+                  }}>
 
                         {/* Bloco OD (Olho Direito) */}
                         {showOD && (
@@ -1140,11 +1132,9 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                           </div>
                         )}
 
-                      </div>
-                    )}
-
                   </div>
-                )}
+
+                </div>
 
               </div>
             );
