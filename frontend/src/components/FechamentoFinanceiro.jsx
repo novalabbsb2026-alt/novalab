@@ -1501,17 +1501,19 @@ const FechamentoFinanceiro = ({ laboratory, currentUser }) => {
                           borderBottom: '1px solid rgba(224,230,240,0.8)' 
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                            <span style={{ 
-                              fontFamily: 'monospace', 
-                              fontWeight: 700, 
-                              fontSize: '0.9rem', 
-                              color: 'hsl(var(--primary))',
-                              background: 'hsl(var(--primary) / 0.08)',
-                              padding: '2px 8px',
-                              borderRadius: '4px'
-                            }}>
-                              {item.client_order_number ? `Pedido: ${item.client_order_number}` : (item.os_number || 'Pedido Loja')}
-                            </span>
+                            {item.client_order_number && String(item.client_order_number).trim() ? (
+                              <span style={{ 
+                                fontFamily: 'monospace', 
+                                fontWeight: 700, 
+                                fontSize: '0.9rem', 
+                                color: 'hsl(var(--primary))',
+                                background: 'hsl(var(--primary) / 0.08)',
+                                padding: '2px 8px',
+                                borderRadius: '4px'
+                              }}>
+                                Pedido: {String(item.client_order_number).trim()}
+                              </span>
+                            ) : null}
                             <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'hsl(var(--text-primary))' }}>
                               Paciente / Cliente: <strong>{item.client_name || 'Consumidor Final'}</strong>
                             </span>
