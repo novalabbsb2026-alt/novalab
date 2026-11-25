@@ -226,7 +226,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
   };
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 16px' }}>
+    <div style={{ width: '100%', maxWidth: '1600px', margin: '0 auto', padding: '24px 20px' }}>
       
       {/* Cabeçalho Superior */}
       <div style={{ 
@@ -267,7 +267,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
               type="button"
               className="btn btn-secondary"
               onClick={onNavigateToWorkflow}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 600 }}
             >
               <Activity size={16} /> Ir para Bancada Ágil
             </button>
@@ -378,11 +378,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
           background: 'white',
           borderRadius: '12px',
           border: '1px solid rgba(224, 230, 240, 0.9)',
-          padding: '20px',
+          padding: '20px 24px',
           marginBottom: '20px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px', alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', alignItems: 'center' }}>
             
             {/* Seleção da Ótica Parceira */}
             <div>
@@ -399,7 +399,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   required
                   style={{
                     width: '100%',
-                    padding: '9px 12px',
+                    padding: '10px 12px',
                     borderRadius: '8px',
                     border: '1px solid #cbd5e1',
                     fontSize: '0.9rem',
@@ -430,7 +430,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 placeholder="Ex: MALOTE-104 / ENTRADA-MANHA"
                 style={{
                   width: '100%',
-                  padding: '9px 12px',
+                  padding: '10px 12px',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   fontSize: '0.9rem',
@@ -449,7 +449,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                padding: '8px 14px',
+                padding: '9px 14px',
                 borderRadius: '8px',
                 background: autoDeductInventory ? 'rgba(16, 185, 129, 0.08)' : '#f8fafc',
                 border: `1px solid ${autoDeductInventory ? '#10b981' : '#cbd5e1'}`,
@@ -490,126 +490,274 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
           </div>
         )}
 
-        {/* Tabela Ágil / Grid Dinâmico de Pedidos */}
-        <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          border: '1px solid rgba(224, 230, 240, 0.9)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-          overflowX: 'auto',
-          marginBottom: '20px'
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: '1100px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#334155' }}>
-                <th style={{ padding: '10px 12px', textAlign: 'center', width: '40px' }}>#</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', width: '120px' }}>Pedido Loja</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', width: '150px' }}>Paciente / Cliente</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', width: '160px' }}>Grade Pertencente</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', width: '220px', background: '#f1f5f9' }}>
-                  Olho Direito (OD)
-                  <div style={{ fontSize: '0.68rem', fontWeight: 500, color: '#64748b' }}>Esf | Cil | Eixo | Add</div>
-                </th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', width: '220px', background: '#f8fafc' }}>
-                  Olho Esquerdo (OE)
-                  <div style={{ fontSize: '0.68rem', fontWeight: 500, color: '#64748b' }}>Esf | Cil | Eixo | Add</div>
-                </th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', width: '140px' }}>Serviço Técnico</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', width: '130px' }}>Tratamento</th>
-                <th style={{ padding: '10px 12px', textAlign: 'right', width: '90px' }}>Valor Total</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', width: '70px' }}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, idx) => {
-                const isMF = row.matrix_type === 'MF_ACB' || row.matrix_type === 'MF_BLOCO';
+        {/* LISTA DE PEDIDOS / CARDS MODULARES (LAYOUT TOTALMENTE VISÍVEL E ESPAÇOSO) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+          {rows.map((row, idx) => {
+            const isMF = row.matrix_type === 'MF_ACB' || row.matrix_type === 'MF_BLOCO';
 
-                return (
-                  <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : 'rgba(248, 250, 252, 0.5)' }}>
-                    
-                    {/* Índice */}
-                    <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700, color: '#94a3b8' }}>
-                      {idx + 1}
-                    </td>
+            return (
+              <div 
+                key={row.id}
+                style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(224, 230, 240, 0.95)',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                  padding: '18px 20px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {/* Linha 1: Dados Comerciais do Pedido e Tipo de Lente */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'minmax(40px, 50px) minmax(130px, 1fr) minmax(160px, 1.2fr) minmax(170px, 1.2fr) minmax(180px, 1.3fr) minmax(160px, 1.2fr) minmax(110px, 0.9fr) minmax(80px, 90px)',
+                  gap: '12px',
+                  alignItems: 'end'
+                }}>
+                  
+                  {/* Badge # */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', marginBottom: '5px', textAlign: 'center' }}>Item</label>
+                    <div style={{
+                      height: '38px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '8px',
+                      background: 'rgba(15, 23, 42, 0.05)',
+                      fontWeight: 800,
+                      fontSize: '0.9rem',
+                      color: 'hsl(var(--primary))'
+                    }}>
+                      #{idx + 1}
+                    </div>
+                  </div>
 
-                    {/* Pedido Loja */}
-                    <td style={{ padding: '6px 8px' }}>
+                  {/* Pedido Loja */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
+                      Pedido Loja
+                    </label>
+                    <input
+                      type="text"
+                      value={row.client_order_number}
+                      onChange={(e) => handleRowChange(row.id, 'client_order_number', e.target.value)}
+                      placeholder="Ex: 1042"
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Paciente / Cliente */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
+                      Paciente / Cliente
+                    </label>
+                    <input
+                      type="text"
+                      value={row.client_name}
+                      onChange={(e) => handleRowChange(row.id, 'client_name', e.target.value)}
+                      placeholder="Consumidor Final"
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Grade Pertencente */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
+                      Grade da Lente *
+                    </label>
+                    <select
+                      value={row.matrix_type}
+                      onChange={(e) => handleRowChange(row.id, 'matrix_type', e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        background: row.matrix_type === 'GRADE_167' ? 'rgba(168, 85, 247, 0.08)' : row.matrix_type.startsWith('MF') ? 'rgba(245, 158, 11, 0.08)' : 'white',
+                        color: 'hsl(var(--text-primary))'
+                      }}
+                    >
+                      {MATRIX_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Serviço Técnico */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
+                      Serviço Técnico
+                    </label>
+                    <select
+                      value={row.service_type}
+                      onChange={(e) => handleRowChange(row.id, 'service_type', e.target.value)}
+                      style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    >
+                      {SERVICE_OPTIONS.map(s => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Tratamento */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px' }}>
+                      Tratamento
+                    </label>
+                    <select
+                      value={row.treatment}
+                      onChange={(e) => handleRowChange(row.id, 'treatment', e.target.value)}
+                      style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    >
+                      {TREATMENT_OPTIONS.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Valor Total da OS */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '5px', textAlign: 'right' }}>
+                      Valor Total
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', height: '38px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0 8px', background: '#f8fafc' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginRight: '4px' }}>R$</span>
                       <input
-                        type="text"
-                        value={row.client_order_number}
-                        onChange={(e) => handleRowChange(row.id, 'client_order_number', e.target.value)}
-                        placeholder="Ex: 1042"
+                        type="number"
+                        step="0.50"
+                        value={row.total_amount}
+                        onChange={(e) => handleRowChange(row.id, 'total_amount', parseFloat(e.target.value) || 0)}
                         style={{
                           width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontFamily: 'monospace',
-                          fontWeight: 600,
-                          fontSize: '0.82rem'
+                          border: 'none',
+                          background: 'transparent',
+                          textAlign: 'right',
+                          fontWeight: 800,
+                          fontSize: '0.9rem',
+                          color: '#0f172a',
+                          outline: 'none'
                         }}
                       />
-                    </td>
+                    </div>
+                  </div>
 
-                    {/* Paciente */}
-                    <td style={{ padding: '6px 8px' }}>
-                      <input
-                        type="text"
-                        value={row.client_name}
-                        onChange={(e) => handleRowChange(row.id, 'client_name', e.target.value)}
-                        placeholder="Consumidor Final"
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.82rem'
-                        }}
-                      />
-                    </td>
+                  {/* Botões de Ação */}
+                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', height: '38px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDuplicateRow(row)}
+                      title="Duplicar este pedido"
+                      style={{
+                        height: '38px',
+                        width: '38px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        cursor: 'pointer',
+                        color: '#475569'
+                      }}
+                    >
+                      <Copy size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(row.id)}
+                      title="Remover pedido"
+                      style={{
+                        height: '38px',
+                        width: '38px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        background: 'rgba(239, 68, 68, 0.05)',
+                        cursor: 'pointer',
+                        color: '#dc2626'
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
 
-                    {/* Grade Pertencente */}
-                    <td style={{ padding: '6px 8px' }}>
-                      <select
-                        value={row.matrix_type}
-                        onChange={(e) => handleRowChange(row.id, 'matrix_type', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          background: row.matrix_type === 'GRADE_167' ? 'rgba(168, 85, 247, 0.08)' : row.matrix_type.startsWith('MF') ? 'rgba(245, 158, 11, 0.08)' : 'white'
-                        }}
-                      >
-                        {MATRIX_OPTIONS.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </td>
+                </div>
 
-                    {/* OD: Esf | Cil | Eixo | Add */}
-                    <td style={{ padding: '6px 6px', background: 'rgba(241, 245, 249, 0.6)' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMF ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '4px' }}>
+                {/* Linha 2: Faixa Técnica de Dioptrias (OD e OE com espaço amplo e claro) */}
+                <div style={{
+                  marginTop: '12px',
+                  padding: '10px 16px',
+                  background: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '24px',
+                  flexWrap: 'wrap'
+                }}>
+                  
+                  {/* Bloco OD (Olho Direito) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      color: '#2563eb'
+                    }}>
+                      OD
+                    </span>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
                         <input
                           type="number"
                           step="0.25"
                           value={row.od_spherical}
                           onChange={(e) => handleRowChange(row.id, 'od_spherical', parseFloat(e.target.value) || 0)}
-                          title="Esférico OD"
-                          placeholder="Esf"
-                          style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                          placeholder="0.00"
+                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                         />
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
                         <input
                           type="number"
                           step="0.25"
                           value={row.od_cylindrical}
                           onChange={(e) => handleRowChange(row.id, 'od_cylindrical', parseFloat(e.target.value) || 0)}
-                          title="Cilíndrico OD"
-                          placeholder="Cil"
-                          style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                          placeholder="0.00"
+                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                         />
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
                         <input
                           type="number"
                           step="1"
@@ -617,45 +765,70 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                           max="180"
                           value={row.od_axis}
                           onChange={(e) => handleRowChange(row.id, 'od_axis', parseInt(e.target.value) || 0)}
-                          title="Eixo OD"
-                          placeholder="Eixo"
-                          style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                          placeholder="0"
+                          style={{ width: '60px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                         />
-                        {isMF && (
+                      </div>
+
+                      {isMF && (
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', display: 'block' }}>Adição</span>
                           <input
                             type="number"
                             step="0.25"
                             value={row.od_addition}
                             onChange={(e) => handleRowChange(row.id, 'od_addition', parseFloat(e.target.value) || 0)}
-                            title="Adição OD"
-                            placeholder="Add"
-                            style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #f59e0b', background: '#fffbeb', fontSize: '0.78rem', fontWeight: 600 }}
+                            placeholder="0.00"
+                            style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 700 }}
                           />
-                        )}
-                      </div>
-                    </td>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                    {/* OE: Esf | Cil | Eixo | Add */}
-                    <td style={{ padding: '6px 6px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMF ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '4px' }}>
+                  {/* Separador Vertical */}
+                  <div style={{ width: '1px', height: '32px', background: '#cbd5e1' }} />
+
+                  {/* Bloco OE (Olho Esquerdo) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      background: 'rgba(147, 51, 234, 0.12)',
+                      color: '#7e22ce'
+                    }}>
+                      OE
+                    </span>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Esférico</span>
                         <input
                           type="number"
                           step="0.25"
                           value={row.oe_spherical}
                           onChange={(e) => handleRowChange(row.id, 'oe_spherical', parseFloat(e.target.value) || 0)}
-                          title="Esférico OE"
-                          placeholder="Esf"
-                          style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                          placeholder="0.00"
+                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                         />
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Cilíndrico</span>
                         <input
                           type="number"
                           step="0.25"
                           value={row.oe_cylindrical}
                           onChange={(e) => handleRowChange(row.id, 'oe_cylindrical', parseFloat(e.target.value) || 0)}
-                          title="Cilíndrico OE"
-                          placeholder="Cil"
-                          style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                          placeholder="0.00"
+                          style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                         />
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', display: 'block' }}>Eixo (°)</span>
                         <input
                           type="number"
                           step="1"
@@ -663,114 +836,32 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                           max="180"
                           value={row.oe_axis}
                           onChange={(e) => handleRowChange(row.id, 'oe_axis', parseInt(e.target.value) || 0)}
-                          title="Eixo OE"
-                          placeholder="Eixo"
-                          style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
+                          placeholder="0"
+                          style={{ width: '60px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, background: 'white' }}
                         />
-                        {isMF && (
+                      </div>
+
+                      {isMF && (
+                        <div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#d97706', display: 'block' }}>Adição</span>
                           <input
                             type="number"
                             step="0.25"
                             value={row.oe_addition}
                             onChange={(e) => handleRowChange(row.id, 'oe_addition', parseFloat(e.target.value) || 0)}
-                            title="Adição OE"
-                            placeholder="Add"
-                            style={{ padding: '4px 2px', textAlign: 'center', borderRadius: '4px', border: '1px solid #f59e0b', background: '#fffbeb', fontSize: '0.78rem', fontWeight: 600 }}
+                            placeholder="0.00"
+                            style={{ width: '70px', padding: '4px 6px', textAlign: 'center', borderRadius: '6px', border: '1px solid #f59e0b', background: '#fffbeb', fontSize: '0.82rem', fontWeight: 700 }}
                           />
-                        )}
-                      </div>
-                    </td>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                    {/* Serviço Técnico */}
-                    <td style={{ padding: '6px 8px' }}>
-                      <select
-                        value={row.service_type}
-                        onChange={(e) => handleRowChange(row.id, 'service_type', e.target.value)}
-                        style={{ width: '100%', padding: '6px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
-                      >
-                        {SERVICE_OPTIONS.map(s => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
-                        ))}
-                      </select>
-                    </td>
+                </div>
 
-                    {/* Tratamento */}
-                    <td style={{ padding: '6px 8px' }}>
-                      <select
-                        value={row.treatment}
-                        onChange={(e) => handleRowChange(row.id, 'treatment', e.target.value)}
-                        style={{ width: '100%', padding: '6px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem' }}
-                      >
-                        {TREATMENT_OPTIONS.map(t => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
-                    </td>
-
-                    {/* Preço Total da OS */}
-                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>R$</span>
-                        <input
-                          type="number"
-                          step="0.50"
-                          value={row.total_amount}
-                          onChange={(e) => handleRowChange(row.id, 'total_amount', parseFloat(e.target.value) || 0)}
-                          style={{
-                            width: '65px',
-                            padding: '4px 4px',
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            borderRadius: '4px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.8rem',
-                            color: '#0f172a'
-                          }}
-                        />
-                      </div>
-                    </td>
-
-                    {/* Ações (Duplicar e Excluir) */}
-                    <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleDuplicateRow(row)}
-                          title="Duplicar Pedido"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: '#64748b',
-                            padding: '4px',
-                            borderRadius: '4px'
-                          }}
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRow(row.id)}
-                          title="Remover Pedido"
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: '#ef4444',
-                            padding: '4px',
-                            borderRadius: '4px'
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+              </div>
+            );
+          })}
         </div>
 
         {/* Barra de Ações Inferior e Totalizadores */}
@@ -781,7 +872,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
           flexWrap: 'wrap',
           gap: '16px',
           background: 'white',
-          padding: '16px 20px',
+          padding: '18px 24px',
           borderRadius: '12px',
           border: '1px solid rgba(224, 230, 240, 0.9)',
           boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
@@ -791,14 +882,14 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             type="button"
             onClick={handleAddRow}
             className="btn btn-secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: 600 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 700 }}
           >
             <Plus size={18} /> Adicionar Mais um Pedido (Linha)
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap' }}>
             
-            <div style={{ display: 'flex', gap: '16px', fontSize: '0.88rem' }}>
+            <div style={{ display: 'flex', gap: '20px', fontSize: '0.9rem', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#64748b' }}>Pedidos:</span> <strong>{totalOrders} óculos</strong>
               </div>
@@ -806,7 +897,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 <span style={{ color: '#64748b' }}>Lentes:</span> <strong>{totalLenses} un (OD/OE)</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b' }}>Total do Malote:</span> <strong style={{ color: 'hsl(var(--primary))', fontSize: '1.1rem' }}>R$ {totalBatchPrice.toFixed(2)}</strong>
+                <span style={{ color: '#64748b' }}>Total do Malote:</span> <strong style={{ color: 'hsl(var(--primary))', fontSize: '1.2rem', marginLeft: '4px' }}>R$ {totalBatchPrice.toFixed(2)}</strong>
               </div>
             </div>
 
