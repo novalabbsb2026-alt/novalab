@@ -1,85 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Layers, Plus, Trash2, Copy, Send, CheckCircle2, AlertTriangle, 
-  Store, Package, Activity, ArrowRight, RefreshCw, Sparkles, Check
+  Plus, Trash2, Copy, Send, CheckCircle2, AlertTriangle, 
+  Store, Package, Activity, RefreshCw, Check
 } from 'lucide-react';
-import api, { LensService } from '../services/api';
-
-const MATRIX_OPTIONS = [
-  { value: 'LP_GRADE', label: 'Visão Simples', unitPrice: 33.5 },
-  { value: 'GRADE_167', label: '1.67', unitPrice: 55.0 },
-  { value: 'MF_ACB', label: 'Multifocal Acabado', unitPrice: 42.5 },
-  { value: 'MF_BLOCO', label: 'Multifocal', unitPrice: 47.5 },
-  { value: 'BLOCO_VS', label: 'Bloco Visão Simples', unitPrice: 37.5 },
-];
-
-const EYE_TARGET_OPTIONS = [
-  { value: 'OD_OE', label: 'Ambos (Par)', short: 'OD + OE' },
-  { value: 'OD', label: 'Direito (OD)', short: 'OD' },
-  { value: 'OE', label: 'Esquerdo (OE)', short: 'OE' },
-];
-
-const SERVICE_OPTIONS = [
-  { value: 'Montagem Padrão', label: 'Montagem Padrão', price: 13.0 },
-  { value: 'Aro Fechado (Acetato/Metal)', label: 'Aro Fechado', price: 13.0 },
-  { value: 'Fio de Nylon (Semi-Aro)', label: 'Fio de Nylon', price: 18.0 },
-  { value: 'Parafuso / Balgriff (Três Peças)', label: 'Parafuso / Balgriff', price: 25.0 },
-  { value: 'Coloração Solar / Filtro Especial', label: 'Coloração Solar', price: 20.0 },
-  { value: 'Sem Montagem (Apenas Lentes)', label: 'Sem Montagem', price: 0.0 },
-];
-
-const parseDiopter = (val) => {
-  if (val === null || val === undefined || val === '') return 0.0;
-  const normalized = String(val).trim().replace(',', '.');
-  const parsed = parseFloat(normalized);
-  return Number.isNaN(parsed) ? 0.0 : parsed;
-};
-
-const sanitizeDiopterInput = (raw, allowNegative = true) => {
-  return String(raw).replace(allowNegative ? /[^0-9.,+-]/g : /[^0-9.,+]/g, '');
-};
-
-const formatDiopterOnBlur = (val, { allowNegative = true, emptyIfBlank = false } = {}) => {
-  if (emptyIfBlank && String(val ?? '').trim() === '') return '';
-  let num = parseDiopter(val);
-  if (!allowNegative && num < 0) num = Math.abs(num);
-  return num.toFixed(2);
-};
-
-const createEmptyRow = (index = 1) => ({
-  id: Date.now() + Math.random(),
-  client_order_number: '',
-  tray_number: String(index).padStart(2, '0'),
-  matrix_type: 'LP_GRADE',
-  lens_model_id: '',
-  eye_target: 'OD_OE',
-  has_prescription: true,
-  od_spherical: '0.00',
-  od_cylindrical: '0.00',
-  od_axis: '0',
-  od_addition: '0.00',
-  od_base_curve: '',
-  oe_spherical: '0.00',
-  oe_cylindrical: '0.00',
-  oe_axis: '0',
-  oe_addition: '0.00',
-  oe_base_curve: '',
-  service_type: 'Montagem Padrão',
-  treatment: 'Incolor / Sem Tratamento',
-  lens_unit_price: 0,
-  lens_price: 0,
-  service_price: 13.0,
-  treatment_price: 0.0,
-  total_amount: '',
-  is_manual_total: false,
-  special_instructions: ''
-});
+import api from '../services/api';
+import {
+  getCachedOpticalStores,
+  getCachedLensModels,
+  getCachedInventoryGrid,
+} from '../utils/catalogCache';
+import {
+  MATRIX_OPTIONS,
+  EYE_TARGET_OPTIONS,
+  SERVICE_OPTIONS,
+  parseDiopter,
+  sanitizeDiopterInput,
+  formatDiopterOnBlur,
+  createEmptyRow,
+  checkEyeInventoryBalance,
+} from './malote/maloteHelpers';
+import LensModelCombobox from './malote/LensModelCombobox';
 
 const EntradaMalote = ({ onNavigateToWorkflow }) => {
   const [stores, setStores] = useState([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [lensModels, setLensModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(true);
+  const [inventoryByModel, setInventoryByModel] = useState({});
   const [batchRef, setBatchRef] = useState(() => {
     const d = new Date();
     const dateStr = d.toISOString().slice(0, 10).replace(/-/g, '');
@@ -96,24 +43,22 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     createEmptyRow(2)
   ]);
 
-  // Carrega lista de óticas e modelos de lentes
+  // Carrega lista de óticas e modelos de lentes via cache compartilhado
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoadingStores(true);
         setLoadingModels(true);
-        const [storesRes, modelsRes] = await Promise.all([
-          api.get('/optical-stores/').catch(() => ({ data: [] })),
-          LensService.getModels().catch(() => ({ data: [] }))
+        const [storeList, modelList] = await Promise.all([
+          getCachedOpticalStores().catch(() => []),
+          getCachedLensModels().catch(() => [])
         ]);
 
-        const storeList = storesRes.data?.items || storesRes.data || [];
         setStores(storeList);
         if (storeList.length > 0 && !selectedStoreId) {
           setSelectedStoreId(storeList[0].id);
         }
 
-        const modelList = modelsRes.data?.items || modelsRes.data || [];
         setLensModels(modelList);
       } catch (err) {
         console.error("Erro ao carregar dados iniciais:", err);
@@ -124,6 +69,18 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     };
     fetchData();
   }, []);
+
+  // Carrega grade de estoque em cache para os modelos selecionados nas linhas (validação prévia de saldo)
+  useEffect(() => {
+    const modelIds = Array.from(new Set(rows.map((r) => r.lens_model_id).filter(Boolean)));
+    modelIds.forEach((mid) => {
+      if (!inventoryByModel[mid]) {
+        getCachedInventoryGrid(mid).then((grid) => {
+          setInventoryByModel((prev) => ({ ...prev, [mid]: grid }));
+        });
+      }
+    });
+  }, [rows, inventoryByModel]);
 
   // Carrega a tabela de preços personalizada da ótica selecionada
   useEffect(() => {
@@ -605,6 +562,23 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             const showOE = eyeTarget === 'OD_OE' || eyeTarget === 'OE';
             const fieldCount = 3 + (needsBaseCurve ? 1 : 0) + (needsAddition ? 1 : 0);
             const modelsInMatrix = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (row.matrix_type || 'LP_GRADE').trim().toUpperCase());
+            const modelGrid = row.lens_model_id ? inventoryByModel[row.lens_model_id] : null;
+            const odStock = modelGrid
+              ? checkEyeInventoryBalance(modelGrid, row.matrix_type, 'OD', {
+                  spherical: row.od_spherical,
+                  cylindrical: row.od_cylindrical,
+                  addition: row.od_addition,
+                  baseCurve: row.od_base_curve,
+                })
+              : null;
+            const oeStock = modelGrid
+              ? checkEyeInventoryBalance(modelGrid, row.matrix_type, 'OE', {
+                  spherical: row.oe_spherical,
+                  cylindrical: row.oe_cylindrical,
+                  addition: row.oe_addition,
+                  baseCurve: row.oe_base_curve,
+                })
+              : null;
 
             return (
               <div 
@@ -696,7 +670,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                     </select>
                   </div>
 
-                  {/* Modelo de Lente Disponível na Matriz Selecionada */}
+                  {/* Modelo de Lente com Busca (Combobox) */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
                       <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))' }}>
@@ -708,37 +682,12 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                         </span>
                       )}
                     </div>
-                    <select
+                    <LensModelCombobox
+                      models={modelsInMatrix}
                       value={row.lens_model_id || ''}
-                      onChange={(e) => handleRowChange(row.id, 'lens_model_id', e.target.value)}
-                      style={{
-                        width: '100%',
-                        height: '38px',
-                        padding: '0 8px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        background: 'white',
-                        color: row.lens_model_id ? 'hsl(var(--text-primary))' : '#64748b'
-                      }}
-                    >
-                      {modelsInMatrix.length === 0 ? (
-                        <option value="">Padrão da Matriz</option>
-                      ) : (
-                        <>
-                          <option value="">-- Selecione o Modelo --</option>
-                          {modelsInMatrix.map(m => {
-                            const unitP = resolveLensUnitPrice(m);
-                            return (
-                              <option key={m.id} value={m.id}>
-                                {m.brand || m.name} — {m.treatment || 'Incolor'} | {m.material || 'Resina'} (n={m.refractive_index || '1.56'}) — R$ {unitP.toFixed(2)}/un (Par: R$ {(unitP * 2).toFixed(2)})
-                              </option>
-                            );
-                          })}
-                        </>
-                      )}
-                    </select>
+                      onChange={(newId) => handleRowChange(row.id, 'lens_model_id', newId)}
+                      resolveUnitPrice={resolveLensUnitPrice}
+                    />
                   </div>
 
                   {/* Serviço Técnico */}
@@ -975,17 +924,34 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                             borderRadius: '8px',
                             padding: '8px 10px'
                           }}>
-                            <span style={{
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.74rem',
-                              fontWeight: 800,
-                              background: 'rgba(59, 130, 246, 0.12)',
-                              color: '#2563eb',
-                              flexShrink: 0
-                            }}>
-                              OD
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                              <span style={{
+                                padding: '5px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                background: 'rgba(59, 130, 246, 0.12)',
+                                color: '#2563eb'
+                              }}>
+                                OD
+                              </span>
+                              {odStock && odStock.status !== 'unknown' && (
+                                <span
+                                  title={odStock.status === 'ok' ? `Saldo livre disponível: ${odStock.available} un` : 'Sem saldo disponível nesta dioptria/grade'}
+                                  style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: 800,
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap',
+                                    background: odStock.status === 'ok' ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.12)',
+                                    color: odStock.status === 'ok' ? '#047857' : '#dc2626',
+                                  }}
+                                >
+                                  {odStock.status === 'ok' ? `✓ ${odStock.available} un` : 'Sem saldo'}
+                                </span>
+                              )}
+                            </div>
 
                             <div style={{
                               display: 'grid',
@@ -1076,17 +1042,34 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                             borderRadius: '8px',
                             padding: '8px 10px'
                           }}>
-                            <span style={{
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.74rem',
-                              fontWeight: 800,
-                              background: 'rgba(147, 51, 234, 0.12)',
-                              color: '#7e22ce',
-                              flexShrink: 0
-                            }}>
-                              OE
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                              <span style={{
+                                padding: '5px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                background: 'rgba(147, 51, 234, 0.12)',
+                                color: '#7e22ce'
+                              }}>
+                                OE
+                              </span>
+                              {oeStock && oeStock.status !== 'unknown' && (
+                                <span
+                                  title={oeStock.status === 'ok' ? `Saldo livre disponível: ${oeStock.available} un` : 'Sem saldo disponível nesta dioptria/grade'}
+                                  style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: 800,
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap',
+                                    background: oeStock.status === 'ok' ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.12)',
+                                    color: oeStock.status === 'ok' ? '#047857' : '#dc2626',
+                                  }}
+                                >
+                                  {oeStock.status === 'ok' ? `✓ ${oeStock.available} un` : 'Sem saldo'}
+                                </span>
+                              )}
+                            </div>
 
                             <div style={{
                               display: 'grid',

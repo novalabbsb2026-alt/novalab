@@ -3,7 +3,8 @@ import {
   Factory, CheckCircle2, Clock, AlertTriangle, Zap, Cpu, 
   RotateCcw, RefreshCw, Filter, ShieldAlert
 } from 'lucide-react';
-import { ReportService, OpticalStoreService } from '../../services/api';
+import { ReportService } from '../../services/api';
+import { getCachedOpticalStores } from '../../utils/catalogCache';
 import { downloadBlob } from '../../utils/exportHelper';
 import ReportDatePresets, { getPresetDates } from '../../components/reports/ReportDatePresets';
 import ReportKPICards from '../../components/reports/ReportKPICards';
@@ -21,8 +22,8 @@ export default function TabProducao() {
   const [reportData, setReportData] = useState(null);
 
   useEffect(() => {
-    OpticalStoreService.list('', true, 0, 200)
-      .then((res) => setOpticalStores(res.data?.items || res.data || []))
+    getCachedOpticalStores()
+      .then((list) => setOpticalStores(list || []))
       .catch((err) => console.error('Erro ao buscar óticas:', err));
   }, []);
 
