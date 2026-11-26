@@ -66,11 +66,11 @@ const createEmptyRow = (index = 1) => ({
   oe_base_curve: '',
   service_type: 'Montagem Padrão',
   treatment: 'Incolor / Sem Tratamento',
-  lens_unit_price: 33.5,
-  lens_price: 67.0,
+  lens_unit_price: 0,
+  lens_price: 0,
   service_price: 13.0,
   treatment_price: 0.0,
-  total_amount: 80.0,
+  total_amount: '',
   is_manual_total: false,
   special_instructions: ''
 });
@@ -124,34 +124,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     fetchData();
   }, []);
 
-  // Quando os modelos de lente carregarem, pré-seleciona o modelo padrão para cada linha
-  useEffect(() => {
-    if (lensModels.length > 0) {
-      setRows(prevRows => prevRows.map(r => {
-        if (!r.lens_model_id) {
-          const matching = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (r.matrix_type || 'LP_GRADE').trim().toUpperCase());
-          if (matching.length > 0) {
-            const first = matching[0];
-            const unitPrice = parseFloat(first.sale_price || r.lens_unit_price || 33.5);
-            const qty = (r.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1;
-            const lPrice = Math.round(unitPrice * qty * 100) / 100;
-            const sPrice = parseFloat(r.service_price || 0.0);
-            const tPrice = parseFloat(r.treatment_price || 0.0);
-            return {
-              ...r,
-              lens_model_id: first.id,
-              lens_unit_price: unitPrice,
-              lens_price: lPrice,
-              total_amount: r.is_manual_total ? r.total_amount : Math.round((lPrice + sPrice + tPrice) * 100) / 100
-            };
-          }
-        }
-        return r;
-      }));
-    }
-  }, [lensModels]);
-
-  // Recalcula valor de uma linha (preservando edição manual de Valor Total / desconto)
+  // Recalcula valor de uma linha somente a partir da seleção da lente (preservando edição manual / desconto)
   const handleRowChange = (id, field, value) => {
     setRows(prevRows => prevRows.map(row => {
       if (row.id !== id) return row;
@@ -160,47 +133,38 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
       // Se o operador editou diretamente o Valor Total (desconto/acordo manual), respeita o valor digitado
       if (field === 'total_amount') {
         updated.total_amount = value;
-        updated.is_manual_total = true;
+        updated.is_manual_total = value !== '';
         return updated;
       }
 
       const pricingFields = ['matrix_type', 'lens_model_id', 'eye_target', 'service_type'];
 
-      // Se mudou a matriz, ajusta o modelo, reseta olho para Par se não for multifocal e atualiza preço unitário
+      // Se mudou a matriz, limpa o modelo e o valor até que o operador selecione a lente desejada
       if (field === 'matrix_type') {
         const isMultifocalNext = value === 'MF_ACB' || value === 'MF_BLOCO';
         if (!isMultifocalNext) {
           updated.eye_target = 'OD_OE';
         }
-
-        const mat = MATRIX_OPTIONS.find(m => m.value === value);
-        if (mat) {
-          updated.lens_unit_price = mat.unitPrice;
-        }
-
-        // Filtra modelos disponíveis na matriz selecionada
-        const matchingModels = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === value.trim().toUpperCase());
-        if (matchingModels.length > 0) {
-          const currentValid = matchingModels.some(m => m.id === updated.lens_model_id);
-          if (!currentValid) {
-            updated.lens_model_id = matchingModels[0].id;
-            if (matchingModels[0].sale_price) {
-              updated.lens_unit_price = parseFloat(matchingModels[0].sale_price);
-            }
-            updated.treatment = matchingModels[0].treatment || 'Incolor / Sem Tratamento';
-          }
-        } else {
-          updated.lens_model_id = '';
-        }
+        updated.lens_model_id = '';
+        updated.lens_unit_price = 0;
+        updated.lens_price = 0;
+        updated.total_amount = '';
+        updated.is_manual_total = false;
+        return updated;
       }
 
       // Se mudou o modelo de lente específico na matriz
       if (field === 'lens_model_id') {
+        if (!value) {
+          updated.lens_unit_price = 0;
+          updated.lens_price = 0;
+          updated.total_amount = '';
+          updated.is_manual_total = false;
+          return updated;
+        }
         const selectedM = lensModels.find(m => m.id === value);
         if (selectedM) {
-          if (selectedM.sale_price) {
-            updated.lens_unit_price = parseFloat(selectedM.sale_price);
-          }
+          updated.lens_unit_price = parseFloat(selectedM.sale_price || 0);
           updated.treatment = selectedM.treatment || 'Incolor / Sem Tratamento';
         }
       }
@@ -213,38 +177,31 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         }
       }
 
-      // Recalcula automaticamente o valor do par (2x) ou olho único (1x) + serviço
+      // Recalcula automaticamente o valor do par (2x) ou olho único (1x) + serviço somente se houver lente selecionada
       if (pricingFields.includes(field)) {
-        const qty = (updated.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1;
-        const unitPrice = parseFloat(updated.lens_unit_price || 0);
-        const lPrice = Math.round(unitPrice * qty * 100) / 100;
-        const sPrice = parseFloat(updated.service_price || 0);
-        updated.lens_price = lPrice;
-        updated.treatment_price = 0.0;
-        updated.total_amount = Math.round((lPrice + sPrice) * 100) / 100;
-        updated.is_manual_total = false;
+        if (!updated.lens_model_id) {
+          updated.lens_price = 0;
+          updated.total_amount = '';
+          updated.is_manual_total = false;
+        } else {
+          const qty = (updated.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1;
+          const unitPrice = parseFloat(updated.lens_unit_price || 0);
+          const lPrice = Math.round(unitPrice * qty * 100) / 100;
+          const sPrice = parseFloat(updated.service_price || 0);
+          updated.lens_price = lPrice;
+          updated.treatment_price = 0.0;
+          updated.total_amount = Math.round((lPrice + sPrice) * 100) / 100;
+          updated.is_manual_total = false;
+        }
       }
 
       return updated;
     }));
   };
 
-  // Adiciona nova linha
+  // Adiciona nova linha (sem valor pré-carregado até selecionar a lente)
   const handleAddRow = () => {
-    setRows(prev => {
-      const nextRow = createEmptyRow(prev.length + 1);
-      const matching = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === 'LP_GRADE');
-      if (matching.length > 0) {
-        const first = matching[0];
-        const unitPrice = parseFloat(first.sale_price || nextRow.lens_unit_price || 33.5);
-        const lPrice = Math.round(unitPrice * 2 * 100) / 100;
-        nextRow.lens_model_id = first.id;
-        nextRow.lens_unit_price = unitPrice;
-        nextRow.lens_price = lPrice;
-        nextRow.total_amount = Math.round((lPrice + nextRow.service_price + nextRow.treatment_price) * 100) / 100;
-      }
-      return [...prev, nextRow];
-    });
+    setRows(prev => [...prev, createEmptyRow(prev.length + 1)]);
   };
 
   // Duplica linha existente
@@ -829,6 +786,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                         step="0.01"
                         min="0"
                         value={row.total_amount}
+                        placeholder="0,00"
                         onChange={(e) => handleRowChange(row.id, 'total_amount', e.target.value)}
                         title="Valor calculado automaticamente (par ou olho único + serviço). Editável para aplicar desconto."
                         style={{
