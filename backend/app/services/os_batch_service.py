@@ -67,15 +67,26 @@ class OSBatchService:
             if mt not in models_by_matrix:
                 models_by_matrix[mt] = m
 
-        # Status inicial configurado (padrão EM_PRODUCAO para a bancada ágil)
-        status_raw = payload.initial_status or "EM_PRODUCAO"
-        if hasattr(OSStatus, status_raw):
+        # Status inicial configurado (padrão Produção para a bancada ágil)
+        status_raw = (payload.initial_status or "PRODUCAO").strip()
+        if status_raw.upper() in ("EM_PRODUCAO", "PRODUCAO"):
+            init_status_val = OSStatus.PRODUCAO.value
+        elif hasattr(OSStatus, status_raw):
             init_status_val = getattr(OSStatus, status_raw).value if hasattr(getattr(OSStatus, status_raw), 'value') else status_raw
         else:
             init_status_val = status_raw
 
+        used_os_numbers: set[str] = set()
+
         for item_in in payload.items:
             os_number = await generate_os_number(db)
+            while os_number in used_os_numbers:
+                parts = os_number.rsplit("-", 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    os_number = f"{parts[0]}-{int(parts[1]) + 1:04d}"
+                else:
+                    os_number = f"{os_number}-{len(used_os_numbers) + 1}"
+            used_os_numbers.add(os_number)
             mt_key = (item_in.matrix_type or "LP_GRADE").upper()
             grade_label = GRADE_MAP.get(mt_key, "Visão Simples")
 
@@ -119,11 +130,12 @@ class OSBatchService:
             }
             eye_tag = f"[Baixa: {eye_label_map[eye_target]} | Qtd: {lens_qty} un]"
             rx_tag = "[Com Receita]" if item_in.has_prescription else "[Sem Receita]"
+            serv_tag = f"[Serviço: {item_in.service_type or 'Montagem Padrão'}]"
             instructions = item_in.special_instructions or f"Entrada Lote Malote: {batch_ref}"
-            if eye_tag not in instructions:
-                instructions = f"{instructions} {eye_tag}"
-            if rx_tag not in instructions:
-                instructions = f"{instructions} {rx_tag}"
+            for tag in (serv_tag, eye_tag, rx_tag):
+                if tag not in instructions:
+                    instructions = f"{instructions} {tag}"
+            instructions = instructions[:500]
 
             # 2. Criação da Ordem de Serviço
             new_os = ServiceOrder(
@@ -136,7 +148,6 @@ class OSBatchService:
                 status=init_status_val,
                 os_type="PADRAO",
                 priority="NORMAL",
-                service_type=item_in.service_type or "Montagem Padrão",
                 lens_model_id=chosen_model.id if chosen_model else None,
                 
                 # Dioptrias OD (somente quando OD faz parte do pedido)
@@ -243,6 +254,7 @@ class OSBatchService:
                 note += f" Baixa de estoque de lentes ({eye_label_map[eye_target]}) realizada com sucesso."
             elif inv_warning:
                 note += f" Alerta de estoque: {inv_warning}"
+            note = note[:255]
 
             db.add(OSWorkflowHistory(
                 id=uuid.uuid4(),
