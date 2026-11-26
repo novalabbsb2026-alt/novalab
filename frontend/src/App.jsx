@@ -1,46 +1,52 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import axios from 'axios';
 import { Grid, FileUp, ShieldAlert, Smartphone, FileText, Activity, BarChart2, Store, Key, Layers, DollarSign, Percent, Keyboard, Bell } from 'lucide-react';
-import UsbScanner from './components/UsbScanner';
-import GradeOptica from './components/GradeOptica';
-import GradeBlocos from './components/GradeBlocos';
-import GradeLentes167 from './components/GradeLentes167';
-import GradeMultifocalAcabado from './components/GradeMultifocalAcabado';
-// App.jsx - Updated version for Unified Lens Register & Grade Filtering
-import UnifiedLensRegister from './components/UnifiedLensRegister';
-import MatrizVisaoSimples from './components/MatrizVisaoSimples';
-import XMLUpload from './components/XMLUpload';
-import DashboardAlerts from './components/DashboardAlerts';
-import FallbackModal from './components/FallbackModal';
-import OSUpload from './components/OSUpload';
-import OSWorkflow from './components/OSWorkflow';
-import OSDashboard from './components/OSDashboard';
-import AdminLentes from './components/AdminLentes';
 import Login from './components/Login';
 import api, { getBaseUrl } from './services/api';
-import CadastroOticas from './components/CadastroOticas';
-import CatalogoFinanceiro from './components/CatalogoFinanceiro';
-import TabelaPrecos from './components/TabelaPrecos';
-import FechamentoFinanceiro from './components/FechamentoFinanceiro';
-import DashboardGerencial from './components/DashboardGerencial';
-import GerenciamentoUsuarios from './components/GerenciamentoUsuarios';
 import GlobalSearch from './components/GlobalSearch';
 import SmartMenuBar from './components/SmartMenu';
-import DashboardExecutivo from './components/DashboardExecutivo';
-import ParametrosSistema from './components/ParametrosSistema';
-import GestaoPedidosFornecedor from './components/GestaoPedidosFornecedor';
-import CentralAlertasFinanceiros from './components/CentralAlertasFinanceiros';
-import OSRegistrationForm from './components/OSRegistrationForm';
-import OSDetail from './components/OSDetail';
-
-import FilaOrdensBloqueadas from './components/FilaOrdensBloqueadas';
-import DashboardDRE from './components/DashboardDRE';
-import RelatoriosHub from './pages/reports/RelatoriosHub';
-import TenantManagementModal from './components/TenantManagementModal';
-import PainelLaboratorios from './pages/PainelLaboratorios';
-import EntradaMalote from './components/EntradaMalote';
 import { maskCNPJ, maskPhone, maskCEP, maskIE } from './utils/maskHelper';
 import { TrendingUp, Users, ChevronDown, Plus, Wrench, Settings, Building2, BarChart3, Lock, Sparkles, Menu, X, LogOut, Package } from 'lucide-react';
+
+// Code-splitting sob demanda (React.lazy) — reduz drasticamente o bundle inicial
+const UsbScanner = lazy(() => import('./components/UsbScanner'));
+const GradeOptica = lazy(() => import('./components/GradeOptica'));
+const GradeBlocos = lazy(() => import('./components/GradeBlocos'));
+const GradeLentes167 = lazy(() => import('./components/GradeLentes167'));
+const GradeMultifocalAcabado = lazy(() => import('./components/GradeMultifocalAcabado'));
+const UnifiedLensRegister = lazy(() => import('./components/UnifiedLensRegister'));
+const MatrizVisaoSimples = lazy(() => import('./components/MatrizVisaoSimples'));
+const XMLUpload = lazy(() => import('./components/XMLUpload'));
+const DashboardAlerts = lazy(() => import('./components/DashboardAlerts'));
+const FallbackModal = lazy(() => import('./components/FallbackModal'));
+const OSUpload = lazy(() => import('./components/OSUpload'));
+const OSWorkflow = lazy(() => import('./components/OSWorkflow'));
+const OSDashboard = lazy(() => import('./components/OSDashboard'));
+const AdminLentes = lazy(() => import('./components/AdminLentes'));
+const CadastroOticas = lazy(() => import('./components/CadastroOticas'));
+const CatalogoFinanceiro = lazy(() => import('./components/CatalogoFinanceiro'));
+const TabelaPrecos = lazy(() => import('./components/TabelaPrecos'));
+const FechamentoFinanceiro = lazy(() => import('./components/FechamentoFinanceiro'));
+const DashboardGerencial = lazy(() => import('./components/DashboardGerencial'));
+const GerenciamentoUsuarios = lazy(() => import('./components/GerenciamentoUsuarios'));
+const DashboardExecutivo = lazy(() => import('./components/DashboardExecutivo'));
+const ParametrosSistema = lazy(() => import('./components/ParametrosSistema'));
+const GestaoPedidosFornecedor = lazy(() => import('./components/GestaoPedidosFornecedor'));
+const CentralAlertasFinanceiros = lazy(() => import('./components/CentralAlertasFinanceiros'));
+const OSRegistrationForm = lazy(() => import('./components/OSRegistrationForm'));
+const OSDetail = lazy(() => import('./components/OSDetail'));
+const FilaOrdensBloqueadas = lazy(() => import('./components/FilaOrdensBloqueadas'));
+const DashboardDRE = lazy(() => import('./components/DashboardDRE'));
+const RelatoriosHub = lazy(() => import('./pages/reports/RelatoriosHub'));
+const TenantManagementModal = lazy(() => import('./components/TenantManagementModal'));
+const PainelLaboratorios = lazy(() => import('./pages/PainelLaboratorios'));
+const EntradaMalote = lazy(() => import('./components/EntradaMalote'));
+
+const LazyFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 20px', color: 'hsl(var(--text-muted))', fontSize: '0.9rem', fontWeight: 600 }}>
+    Carregando módulo...
+  </div>
+);
 
 
 
@@ -1125,6 +1131,7 @@ function App() {
       {/* Conteúdo Dinâmico */}
       <main className="app-container">
         <TabErrorBoundary activeTab={activeTab} onReset={() => setActiveTab('grid')}>
+        <Suspense fallback={<LazyFallback />}>
         {activeTab === 'scanner' && (
           <div style={{ maxWidth: '500px', margin: '0 auto', width: '100%' }}>
             <UsbScanner 
@@ -1275,6 +1282,7 @@ function App() {
         {activeTab === 'relatorios-bi' && (
           <RelatoriosHub currentUser={currentUser} />
         )}
+        </Suspense>
         </TabErrorBoundary>
       </main>
 
@@ -1286,6 +1294,7 @@ function App() {
 
       {/* Modal de Reconciliação / Fallback */}
       {fallbackData && (
+        <Suspense fallback={null}>
         <FallbackModal 
           barcode={fallbackData.barcode}
           initialQty={fallbackData.quantity}
@@ -1297,6 +1306,7 @@ function App() {
           onClose={() => setFallbackData(null)}
           onSuccess={handleFallbackSuccess}
         />
+        </Suspense>
       )}
 
       {/* Toast flutuante premium */}
@@ -1456,16 +1466,19 @@ function App() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            <Suspense fallback={<LazyFallback />}>
             <OSDetail
               osId={selectedOSIdForModal}
               onClose={() => setSelectedOSIdForModal(null)}
             />
+            </Suspense>
           </div>
         </div>
       )}
 
       {/* Modal de Gestão Multi-Tenant para SuperAdmin */}
       {currentUser?.is_superadmin && (
+        <Suspense fallback={null}>
         <TenantManagementModal
           isOpen={showTenantModal}
           onClose={() => setShowTenantModal(false)}
@@ -1480,6 +1493,7 @@ function App() {
             }));
           }}
         />
+        </Suspense>
       )}
     </div>
   );

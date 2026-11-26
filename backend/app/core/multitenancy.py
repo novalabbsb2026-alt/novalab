@@ -310,5 +310,17 @@ async def run_multitenant_migrations(conn):
     except Exception as e:
         logger.warning(f"[MULTI-TENANT] Erro criando/atualizando SuperAdmin {SUPERADMIN_EMAIL}: {e}")
 
+    # 8. Índices compostos para alta performance em consultas Multi-Tenant
+    composite_indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_service_orders_tenant_status_created ON service_orders (tenant_id, status, created_at);",
+        "CREATE INDEX IF NOT EXISTS idx_lens_inv_tenant_model_deg ON lens_inventory_grade (tenant_id, lens_model_id, spherical, cylindrical);",
+        "CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_created ON audit_logs (tenant_id, created_at);",
+    ]
+    for idx_sql in composite_indexes:
+        try:
+            await conn.execute(text(idx_sql))
+        except Exception as idx_err:
+            logger.debug(f"[MULTI-TENANT] Índice composto ignorado: {idx_err}")
+
     _migrations_done = True
     logger.info("[MULTI-TENANT] Migração e Backfill multi-tenant concluídos com sucesso!")

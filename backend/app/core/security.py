@@ -1,13 +1,30 @@
 import os
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Any
 import jwt
 import bcrypt
 
-# Configurações de segurança — SECRET_KEY DEVE ser definida via variável de ambiente.
-# Em produção, nunca use o valor padrão. Gere com: python -c "import secrets; print(secrets.token_hex(32))"
-_secret_key = os.getenv("SECRET_KEY", "novalab-enterprise-secret-key-2026-secure-static")
-SECRET_KEY = _secret_key
+logger = logging.getLogger("novalab.security")
+
+# Configurações de segurança — SECRET_KEY DEVE ser definida via variável de ambiente em produção.
+# Gere com: python -c "import secrets; print(secrets.token_hex(32))"
+_DEFAULT_DEV_SECRET = "novalab-enterprise-secret-key-2026-secure-static"
+_env_secret = os.getenv("SECRET_KEY", "").strip()
+_app_env = os.getenv("APP_ENV", "production").strip().lower()
+_require_strict = os.getenv("REQUIRE_STRICT_SECRET_KEY", "false").strip().lower() == "true"
+
+if not _env_secret:
+    if _require_strict and _app_env != "development":
+        raise RuntimeError("SECRET_KEY obrigatória em produção quando REQUIRE_STRICT_SECRET_KEY=true.")
+    if _app_env != "development":
+        logger.warning(
+            "[SECURITY] Variável SECRET_KEY não configurada no ambiente. "
+            "Configure SECRET_KEY nas variáveis de ambiente de produção o quanto antes."
+        )
+    SECRET_KEY = _DEFAULT_DEV_SECRET
+else:
+    SECRET_KEY = _env_secret
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "360"))  # 6 horas padrão

@@ -1,16 +1,57 @@
+import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict
-from fastapi import APIRouter, Depends
+from typing import Any, Dict, Optional
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 
-from backend.app.core.database import get_db
+from backend.app.core.database import get_db, current_tenant_ctx
+from backend.app.core.multitenancy import DEFAULT_TENANT_ID
+from backend.app.models.tenant import Tenant
 from backend.app.models.os import ServiceOrder, OSStatus
 from backend.app.models.optical_store import OpticalStore
 from backend.app.models.billing import BillingCycle
 from backend.app.models.lens import LensInventoryGrade, LensModel
 
 router = APIRouter()
+
+
+async def _bind_tv_tenant(
+    db: AsyncSession,
+    tenant_slug: Optional[str] = None,
+    tv_token: Optional[str] = None,
+) -> uuid.UUID:
+    """
+    Resolve e fixa o tenant_id no ContextVar para os painéis de TV,
+    evitando vazamento ou mistura de dados entre laboratórios distintos.
+    """
+    target_id = DEFAULT_TENANT_ID
+    target_name = "Nova LAB Matriz"
+    target_slug = "matriz"
+
+    lookup = (tv_token or tenant_slug or "").strip()
+    if lookup:
+        stmt = select(Tenant).where(Tenant.is_active == True)
+        try:
+            parsed_uuid = uuid.UUID(lookup)
+            stmt = stmt.where(Tenant.id == parsed_uuid)
+        except ValueError:
+            stmt = stmt.where(func.lower(Tenant.slug) == lookup.lower())
+        res = await db.execute(stmt)
+        found = res.scalars().first()
+        if found:
+            target_id = found.id
+            target_name = found.name
+            target_slug = found.slug
+
+    current_tenant_ctx.set({
+        "id": target_id,
+        "name": target_name,
+        "slug": target_slug,
+        "is_superadmin": False,
+    })
+    return target_id
+
 
 def _today_range():
     """Retorna (inicio_dia, fim_dia) em UTC."""
@@ -21,22 +62,26 @@ def _today_range():
 
 
 @router.get("/producao", include_in_schema=True)
-async def tv_producao(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+async def tv_producao(
+    tenant_slug: Optional[str] = Query(None, description="Slug do laboratório para exibição isolada na TV"),
+    tv_token: Optional[str] = Query(None, description="ID ou token do laboratório para isolamento Multi-Tenant"),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
     """
-    Painel de TV - Producao.
-    Dados publicos (sem autenticacao) para exibicao em televisao.
+    Painel de TV - Producao (isolado por laboratório e otimizado com GROUP BY único).
     """
+    await _bind_tv_tenant(db, tenant_slug=tenant_slug, tv_token=tv_token)
     start, end = _today_range()
 
-    # Contagem por status
+    # Contagem agregada por status em uma única query SQL (elimina N+1)
+    grouped_res = await db.execute(
+        select(ServiceOrder.status, func.count(ServiceOrder.id))
+        .group_by(ServiceOrder.status)
+    )
     status_counts = {}
-    for s in OSStatus:
-        result = await db.execute(
-            select(func.count(ServiceOrder.id))
-            .where(ServiceOrder.status == s)
-        )
-
-        status_counts[s.value] = result.scalar() or 0
+    for st_val, cnt in grouped_res.all():
+        key = st_val.value if hasattr(st_val, "value") else str(st_val)
+        status_counts[key] = cnt or 0
 
     # OS finalizadas hoje (EXPEDICAO com updated_at hoje)
     producao_hoje = await db.execute(
@@ -113,8 +158,13 @@ async def tv_producao(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
 
 
 @router.get("/comercial", include_in_schema=True)
-async def tv_comercial(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
-    """Painel de TV - Comercial. Publico, sem autenticacao."""
+async def tv_comercial(
+    tenant_slug: Optional[str] = Query(None, description="Slug do laboratório para exibição isolada na TV"),
+    tv_token: Optional[str] = Query(None, description="ID ou token do laboratório para isolamento Multi-Tenant"),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Painel de TV - Comercial (isolado por laboratório)."""
+    await _bind_tv_tenant(db, tenant_slug=tenant_slug, tv_token=tv_token)
     start, end = _today_range()
 
     # OSs do dia
@@ -156,8 +206,13 @@ async def tv_comercial(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
 
 
 @router.get("/estoque", include_in_schema=True)
-async def tv_estoque(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
-    """Painel de TV - Estoque. Publico, sem autenticacao."""
+async def tv_estoque(
+    tenant_slug: Optional[str] = Query(None, description="Slug do laboratório para exibição isolada na TV"),
+    tv_token: Optional[str] = Query(None, description="ID ou token do laboratório para isolamento Multi-Tenant"),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Painel de TV - Estoque (isolado por laboratório)."""
+    await _bind_tv_tenant(db, tenant_slug=tenant_slug, tv_token=tv_token)
 
     # Total de lentes em estoque
     total_lentes = await db.execute(select(func.sum(LensInventoryGrade.quantity_available)))
@@ -207,8 +262,13 @@ async def tv_estoque(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
 
 
 @router.get("/financeiro", include_in_schema=True)
-async def tv_financeiro(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
-    """Painel de TV - Financeiro. Publico, sem autenticacao."""
+async def tv_financeiro(
+    tenant_slug: Optional[str] = Query(None, description="Slug do laboratório para exibição isolada na TV"),
+    tv_token: Optional[str] = Query(None, description="ID ou token do laboratório para isolamento Multi-Tenant"),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Painel de TV - Financeiro (isolado por laboratório)."""
+    await _bind_tv_tenant(db, tenant_slug=tenant_slug, tv_token=tv_token)
     start, end = _today_range()
 
     # Faturamento do dia (ciclos fechados hoje)

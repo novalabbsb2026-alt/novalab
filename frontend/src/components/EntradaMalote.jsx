@@ -86,6 +86,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     return `MALOTE-${dateStr}`;
   });
   const [loadingStores, setLoadingStores] = useState(true);
+  const [storePriceTable, setStorePriceTable] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successResult, setSuccessResult] = useState(null);
@@ -123,6 +124,57 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
     };
     fetchData();
   }, []);
+
+  // Carrega a tabela de preços personalizada da ótica selecionada
+  useEffect(() => {
+    if (!selectedStoreId) {
+      setStorePriceTable(null);
+      return;
+    }
+    let cancelled = false;
+    api.get('/price-tables/', { params: { optical_store_id: selectedStoreId } })
+      .then((res) => {
+        if (cancelled) return;
+        const tables = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        const active = tables.find(t => t.is_active !== false) || tables[0] || null;
+        setStorePriceTable(active);
+      })
+      .catch(() => {
+        if (!cancelled) setStorePriceTable(null);
+      });
+    return () => { cancelled = true; };
+  }, [selectedStoreId]);
+
+  // Atalho de teclado Alt + N para adicionar um novo pedido rapidamente no malote
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setRows(prev => [...prev, createEmptyRow(prev.length + 1)]);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Resolve o preço unitário da lente respeitando a tabela personalizada ou desconto da ótica
+  const resolveLensUnitPrice = (model) => {
+    if (!model) return 0;
+    const baseSale = parseFloat(model.sale_price || 0);
+    if (storePriceTable) {
+      const customItem = (storePriceTable.items || []).find(
+        it => it.entity_type === 'product' && String(it.entity_id) === String(model.id)
+      );
+      if (customItem && customItem.custom_price !== undefined && customItem.custom_price !== null) {
+        return Math.round(parseFloat(customItem.custom_price) * 100) / 100;
+      }
+      const discPct = parseFloat(storePriceTable.discount_percent || 0);
+      if (discPct > 0 && baseSale > 0) {
+        return Math.round(baseSale * (1 - discPct / 100) * 100) / 100;
+      }
+    }
+    return baseSale;
+  };
 
   // Recalcula valor de uma linha somente a partir da seleção da lente (preservando edição manual / desconto)
   const handleRowChange = (id, field, value) => {
@@ -164,7 +216,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         }
         const selectedM = lensModels.find(m => m.id === value);
         if (selectedM) {
-          updated.lens_unit_price = parseFloat(selectedM.sale_price || 0);
+          updated.lens_unit_price = resolveLensUnitPrice(selectedM);
           updated.treatment = selectedM.treatment || 'Incolor / Sem Tratamento';
         }
       }
@@ -677,7 +729,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                         <>
                           <option value="">-- Selecione o Modelo --</option>
                           {modelsInMatrix.map(m => {
-                            const unitP = parseFloat(m.sale_price || 0);
+                            const unitP = resolveLensUnitPrice(m);
                             return (
                               <option key={m.id} value={m.id}>
                                 {m.brand || m.name} — {m.treatment || 'Incolor'} | {m.material || 'Resina'} (n={m.refractive_index || '1.56'}) — R$ {unitP.toFixed(2)}/un (Par: R$ {(unitP * 2).toFixed(2)})
@@ -1141,9 +1193,10 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             type="button"
             onClick={handleAddRow}
             className="btn btn-secondary"
+            title="Atalho de teclado: Alt + N"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 700 }}
           >
-            <Plus size={18} /> Adicionar Mais um Pedido (Linha)
+            <Plus size={18} /> Adicionar Mais um Pedido (Alt+N)
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap' }}>

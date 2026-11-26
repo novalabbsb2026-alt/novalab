@@ -19,25 +19,39 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, and_, or_, text
 from sqlalchemy.orm import selectinload
 from backend.app.core.config import settings
-from backend.app.core.database import engine, Base
+from backend.app.core.database import engine, Base, current_user_ctx, current_tenant_ctx
+from backend.app.core.logging_config import logger
 from backend.app.core.multitenancy import run_multitenant_migrations
 from backend.app.api.router import api_router
 from backend.app.models import * # Garante que os modelos estão registrados na Base
 
+_IS_DEV = os.getenv("APP_ENV", "production").strip().lower() == "development"
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="API de controle de estoque e grade óptica da fábrica Nova Lab.",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    version="1.2.0",
+    docs_url="/docs" if _IS_DEV or os.getenv("ENABLE_DOCS", "true").lower() == "true" else None,
+    redoc_url="/redoc" if _IS_DEV or os.getenv("ENABLE_DOCS", "true").lower() == "true" else None
 )
 
-# Configuração de CORS — define as origens permitidas via variável de ambiente.
-# Em desenvolvimento: ALLOWED_ORIGINS=http://localhost:5173
-# Em produção: ALLOWED_ORIGINS=https://novaLab.com.br,https://app.novalab.com.br
+# Configuração de CORS segura — usa ALLOWED_ORIGINS quando definido, com fallback para domínios conhecidos.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _raw_origins:
+    _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+else:
+    _allowed_origins = [
+        "https://novalab-beige.vercel.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*",
+    allow_origins=_allowed_origins,
+    allow_origin_regex=r"^https://novalab[a-z0-9-]*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,7 +61,11 @@ _startup_migration_done = False
 _startup_migration_lock = asyncio.Lock()
 
 @app.middleware("http")
-async def ensure_multitenant_migrations_middleware(request, call_next):
+async def tenant_context_and_migrations_middleware(request, call_next):
+    """
+    Garante isolamento hermético de ContextVar por requisição (resetando usuário e tenant
+    no bloco finally) e executa migrações multi-tenant idempotentes no cold start.
+    """
     global _startup_migration_done
     if not _startup_migration_done and not request.url.path.startswith("/docs") and not request.url.path.startswith("/openapi.json"):
         async with _startup_migration_lock:
@@ -56,19 +74,33 @@ async def ensure_multitenant_migrations_middleware(request, call_next):
                     async with engine.begin() as conn:
                         await run_multitenant_migrations(conn)
                 except Exception as e:
-                    print(f"[BOOTSTRAP MIGRATION ERROR] {e}")
+                    logger.error(f"[BOOTSTRAP MIGRATION ERROR] {e}")
                 _startup_migration_done = True
-    response = await call_next(request)
-    return response
+
+    user_token = current_user_ctx.set(None)
+    tenant_token = current_tenant_ctx.set(None)
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        current_user_ctx.reset(user_token)
+        current_tenant_ctx.reset(tenant_token)
 
 from fastapi.responses import JSONResponse
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    import traceback
+    error_id = uuid.uuid4().hex[:8]
+    logger.exception(f"[UNHANDLED ERROR ref={error_id}] {request.method} {request.url.path}: {exc}")
+    if _IS_DEV:
+        import traceback
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc), "error_id": error_id, "traceback": traceback.format_exc()}
+        )
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc), "traceback": traceback.format_exc()}
+        content={"detail": f"Erro interno inesperado no servidor (ref: {error_id}).", "error_id": error_id}
     )
 
 @app.get("/db-health")
@@ -78,16 +110,17 @@ async def db_health():
         async with engine.connect() as conn:
             res = await conn.execute(text("SELECT version();"))
             row = res.scalar()
-            try:
-                await conn.execute(text("SELECT COUNT(*) FROM users;"))
-            except Exception:
-                pass
-        masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "SEM_ARROBA"
-        return {"status": "ok", "db_version": str(row), "host": masked, "version": "v1.1.0-vercel"}
+        if _IS_DEV:
+            masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "local"
+            return {"status": "ok", "db_version": str(row), "host": masked, "version": "v1.2.0"}
+        return {"status": "ok", "version": "v1.2.0"}
     except Exception as e:
-        import traceback
-        masked = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "SEM_ARROBA"
-        return {"status": "error", "error": str(e), "traceback": traceback.format_exc(), "host": masked}
+        error_id = uuid.uuid4().hex[:8]
+        logger.exception(f"[DB-HEALTH ERROR ref={error_id}] {e}")
+        if _IS_DEV:
+            import traceback
+            return {"status": "error", "error": str(e), "error_id": error_id, "traceback": traceback.format_exc()}
+        return {"status": "error", "error_id": error_id}
 
 
 

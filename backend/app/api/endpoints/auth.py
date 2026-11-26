@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import time
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -12,15 +14,46 @@ from backend.app.api.deps import get_current_user
 
 router = APIRouter()
 
+# Rate limiter leve em memória (janela deslizante de 5 minutos, máx. 15 tentativas falhas por IP+e-mail)
+_LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_MAX_ATTEMPTS = 15
+_RATE_LIMIT_WINDOW_SEC = 300
+
+
+def _check_login_rate_limit(key: str) -> None:
+    now = time.monotonic()
+    recent = [ts for ts in _LOGIN_ATTEMPTS[key] if (now - ts) < _RATE_LIMIT_WINDOW_SEC]
+    _LOGIN_ATTEMPTS[key] = recent
+    if len(recent) >= _RATE_LIMIT_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente."
+        )
+
+
+def _record_login_failure(key: str) -> None:
+    _LOGIN_ATTEMPTS[key].append(time.monotonic())
+
+
+def _clear_login_failures(key: str) -> None:
+    _LOGIN_ATTEMPTS.pop(key, None)
+
+
 @router.post("/login", response_model=Token)
 async def login(
     payload: LoginPayload,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Realiza o login de funcionários da fábrica (Operadores e Administradores)
     utilizando e-mail e senha. Retorna o token JWT e as informações do perfil.
     """
+    email_clean = payload.email.strip().lower() if payload.email else ""
+    client_ip = request.client.host if request.client else "unknown"
+    rate_key = f"{client_ip}:{email_clean}"
+    _check_login_rate_limit(rate_key)
+
     # Garante que as migrações Multi-Tenant rodaram antes da consulta de autenticação
     from backend.app.core.multitenancy import run_multitenant_migrations, _migrations_done
     if not _migrations_done:
@@ -31,7 +64,6 @@ async def login(
             pass
 
     # Busca o usuário pelo e-mail (insensível a maiúsculas e sem espaços extras)
-    email_clean = payload.email.strip().lower() if payload.email else ""
     query = (
         select(User)
         .where(func.lower(User.email) == email_clean)
@@ -41,6 +73,7 @@ async def login(
     user = result.scalars().first()
     
     if not user:
+        _record_login_failure(rate_key)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="E-mail ou senha incorretos."
@@ -48,10 +81,13 @@ async def login(
         
     # Verifica a senha
     if not verify_password(payload.password.strip(), user.hashed_password):
+        _record_login_failure(rate_key)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="E-mail ou senha incorretos."
         )
+
+    _clear_login_failures(rate_key)
 
         
     if not user.is_active:
