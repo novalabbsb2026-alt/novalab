@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 class OpticalStoreBase(BaseModel):
     corporate_name: str
     trade_name: str
+    lab_nickname: Optional[str] = None
     fantasy_name: Optional[str] = None
     cnpj: str
 
@@ -21,6 +22,7 @@ class OpticalStoreCreate(OpticalStoreBase):
 class OpticalStoreUpdate(BaseModel):
     corporate_name: Optional[str] = None
     trade_name: Optional[str] = None
+    lab_nickname: Optional[str] = None
     cnpj: Optional[str] = None
     ie: Optional[str] = None
     telephone: Optional[str] = None

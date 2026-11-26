@@ -13,6 +13,7 @@ class OpticalStore(Base):
     tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     corporate_name: Mapped[str] = mapped_column(String(200), nullable=False)
     trade_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    lab_nickname: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Identificação informal exclusiva do laboratório (não aparece em faturas/relatórios formais)
     cnpj: Mapped[str] = mapped_column(String(18), unique=True, nullable=False, index=True)
     ie: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     telephone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)

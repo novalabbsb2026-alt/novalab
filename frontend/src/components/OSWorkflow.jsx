@@ -630,7 +630,7 @@ const OSWorkflow = ({ onOpenMalote }) => {
               style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
               onClick={onOpenMalote}
             >
-              <Package size={16} /> + Entrada por Malote
+              <Package size={16} /> + Registrar OS
             </button>
           )}
 
@@ -765,7 +765,11 @@ const OSWorkflow = ({ onOpenMalote }) => {
                   {os.optical_store && (
                     <div>
                       <span style={{ fontSize: '0.75rem', color: 'hsl(var(--text-muted))', display: 'block' }}>ÓTICA COMERCIAL</span>
-                      <span style={{ color: 'white', fontWeight: 600 }}>{os.optical_store.fantasy_name}</span>
+                      <span style={{ color: 'white', fontWeight: 600 }}>
+                        {os.optical_store.lab_nickname
+                          ? `${os.optical_store.lab_nickname} (${os.optical_store.fantasy_name || os.optical_store.trade_name})`
+                          : (os.optical_store.fantasy_name || os.optical_store.trade_name)}
+                      </span>
                     </div>
                   )}
                   <div>

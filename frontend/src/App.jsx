@@ -571,14 +571,7 @@ function App() {
                   className={`dropdown-item ${activeTab === 'os-malote' ? 'active' : ''}`}
                   onClick={() => { setActiveTab('os-malote'); setOpenDropdown(null); }}
                 >
-                  <Package size={14} style={{ color: 'hsl(var(--primary))' }} /> Entrada por Malote / Lote
-                </button>
-                <button 
-                  type="button"
-                  className={`dropdown-item ${activeTab === 'os-factory-register' || activeTab === 'os-upload' ? 'active' : ''}`}
-                  onClick={() => { setActiveTab('os-factory-register'); setOpenDropdown(null); }}
-                >
-                  <Plus size={14} style={{ color: 'hsl(var(--primary))' }} /> Nova OS de Fábrica (Com OCR & Manual)
+                  <Package size={14} style={{ color: 'hsl(var(--primary))' }} /> Registrar OS
                 </button>
                 <button 
                   type="button"
@@ -961,10 +954,7 @@ function App() {
                 {mobileExpandedGroup === 'os' && (
                   <div className="mobile-nav-subitems">
                     <button type="button" className={`mobile-nav-item ${activeTab === 'os-malote' ? 'active' : ''}`} onClick={() => { setActiveTab('os-malote'); setMobileDrawerOpen(false); }}>
-                      <Package size={16} /> Entrada por Malote / Lote
-                    </button>
-                    <button type="button" className={`mobile-nav-item ${activeTab === 'os-factory-register' || activeTab === 'os-upload' ? 'active' : ''}`} onClick={() => { setActiveTab('os-factory-register'); setMobileDrawerOpen(false); }}>
-                      <Plus size={16} /> Nova OS de Fábrica
+                      <Package size={16} /> Registrar OS
                     </button>
                     <button type="button" className={`mobile-nav-item ${activeTab === 'os-workflow' ? 'active' : ''}`} onClick={() => { setActiveTab('os-workflow'); setMobileDrawerOpen(false); }}>
                       <Activity size={16} /> Bancada OS
@@ -1148,7 +1138,7 @@ function App() {
         )}
 
         {activeTab === 'os-malote' && (
-          <TabErrorBoundary tabName="Entrada por Malote">
+          <TabErrorBoundary tabName="Registrar OS">
             <EntradaMalote onNavigateToWorkflow={() => setActiveTab('os-workflow')} />
           </TabErrorBoundary>
         )}

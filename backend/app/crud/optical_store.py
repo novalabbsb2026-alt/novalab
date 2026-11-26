@@ -46,6 +46,7 @@ async def get_optical_stores(
             or_(
                 OpticalStore.corporate_name.ilike(search_term),
                 OpticalStore.trade_name.ilike(search_term),
+                OpticalStore.lab_nickname.ilike(search_term),
                 OpticalStore.cnpj.ilike(search_term)
             )
         )
@@ -66,6 +67,7 @@ async def create_optical_store(db: AsyncSession, store_in: OpticalStoreCreate) -
     db_store = OpticalStore(
         corporate_name=store_in.corporate_name,
         trade_name=store_in.trade_name,
+        lab_nickname=store_in.lab_nickname.strip() if store_in.lab_nickname else None,
         cnpj=store_in.cnpj,
         ie=store_in.ie,
         telephone=store_in.telephone,

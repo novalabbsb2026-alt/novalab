@@ -4,6 +4,7 @@ import {
   X, AlertCircle, RefreshCw, Filter, ShieldAlert 
 } from 'lucide-react';
 import { OpticalStoreService } from '../services/api';
+import { invalidateCatalogCache } from '../utils/catalogCache';
 import { maskCNPJ, maskPhone, maskIE } from '../utils/maskHelper';
 
 const CadastroOticas = () => {
@@ -24,6 +25,7 @@ const CadastroOticas = () => {
     id: null,
     corporate_name: '',
     trade_name: '',
+    lab_nickname: '',
     cnpj: '',
     ie: '',
     telephone: '',
@@ -85,6 +87,7 @@ const CadastroOticas = () => {
       id: null,
       corporate_name: '',
       trade_name: '',
+      lab_nickname: '',
       cnpj: '',
       ie: '',
       telephone: '',
@@ -102,6 +105,7 @@ const CadastroOticas = () => {
       id: store.id,
       corporate_name: store.corporate_name,
       trade_name: store.trade_name,
+      lab_nickname: store.lab_nickname || '',
       cnpj: maskCNPJ(store.cnpj || ''),
       ie: maskIE(store.ie || ''),
       telephone: maskPhone(store.telephone || ''),
@@ -126,6 +130,7 @@ const CadastroOticas = () => {
       const payload = {
         corporate_name: formData.corporate_name,
         trade_name: formData.trade_name,
+        lab_nickname: formData.lab_nickname?.trim() || null,
         cnpj: formData.cnpj,
         ie: formData.ie || null,
         telephone: formData.telephone || null,
@@ -145,6 +150,7 @@ const CadastroOticas = () => {
         showToast('Ótica cadastrada com sucesso!', 'success');
         setStores([res.data, ...stores]);
       }
+      invalidateCatalogCache();
       setIsFormModalOpen(false);
     } catch (err) {
       console.error(err);
@@ -393,6 +399,23 @@ const CadastroOticas = () => {
                     onChange={(e) => setFormData({ ...formData, corporate_name: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Identificação Interna / Apelido (Uso do Laboratório)
+                </label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="Ex: Ótica do João / Matriz Centro"
+                  maxLength={100}
+                  value={formData.lab_nickname}
+                  onChange={(e) => setFormData({ ...formData, lab_nickname: e.target.value })}
+                />
+                <span style={{ fontSize: '0.73rem', color: 'hsl(var(--text-muted))', marginTop: '4px', display: 'block' }}>
+                  Campo informal apenas para facilitar a identificação na visualização de OS. Não consta em faturas ou relatórios formais.
+                </span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>

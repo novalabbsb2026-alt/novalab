@@ -310,6 +310,15 @@ async def run_multitenant_migrations(conn):
     except Exception as e:
         logger.warning(f"[MULTI-TENANT] Erro criando/atualizando SuperAdmin {SUPERADMIN_EMAIL}: {e}")
 
+    # 7b. Garante coluna informal lab_nickname em optical_stores (uso interno do laboratório na visualização de OS)
+    try:
+        if is_postgres:
+            await conn.execute(text("ALTER TABLE optical_stores ADD COLUMN IF NOT EXISTS lab_nickname VARCHAR(100);"))
+        else:
+            await conn.execute(text("ALTER TABLE optical_stores ADD COLUMN lab_nickname VARCHAR(100);"))
+    except Exception:
+        pass
+
     # 8. Índices compostos para alta performance em consultas Multi-Tenant
     composite_indexes = [
         "CREATE INDEX IF NOT EXISTS idx_service_orders_tenant_status_created ON service_orders (tenant_id, status, created_at);",

@@ -337,10 +337,10 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: 'hsl(var(--text-primary))' }}>
-                Entrada Rápida por Malote / Lote de Serviços
+                Registrar OS
               </h2>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'hsl(var(--text-secondary))' }}>
-                Cadastre de uma só vez múltiplos pedidos da mesma ótica com baixa automática de lentes e faturamento consolidado.
+                Registre uma ou múltiplas ordens de serviço da ótica parceira com baixa automática de lentes e faturamento consolidado.
               </p>
             </div>
           </div>
@@ -498,7 +498,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   <option value="">-- Selecione a Ótica Parceira --</option>
                   {stores.map(st => (
                     <option key={st.id} value={st.id}>
-                      {st.trade_name || st.corporate_name} {st.cnpj ? `(${st.cnpj})` : ''}
+                      {st.lab_nickname ? `${st.lab_nickname} — ` : ''}{st.trade_name || st.corporate_name} {st.cnpj ? `(${st.cnpj})` : ''}
                     </option>
                   ))}
                 </select>
