@@ -39,8 +39,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
   const [successResult, setSuccessResult] = useState(null);
 
   const [rows, setRows] = useState([
-    createEmptyRow(1),
-    createEmptyRow(2)
+    createEmptyRow(1)
   ]);
 
   // Carrega lista de óticas e modelos de lentes via cache compartilhado
@@ -278,7 +277,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
       setSubmitting(true);
       const payload = {
         optical_store_id: selectedStoreId,
-        batch_reference: batchRef.trim() || undefined,
+        batch_reference: rows.length > 1 ? (batchRef.trim() || undefined) : undefined,
         initial_status: "EM_PRODUCAO",
         auto_deduct_inventory: true,
         items: rows.map(r => {
@@ -328,7 +327,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
   const handleResetForm = () => {
     setSuccessResult(null);
-    setRows([createEmptyRow(1), createEmptyRow(2)]);
+    setRows([createEmptyRow(1)]);
     const d = new Date();
     setBatchRef(`MALOTE-${d.toISOString().slice(0, 10).replace(/-/g, '')}`);
   };
@@ -403,7 +402,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 <CheckCircle2 size={36} />
               </div>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', color: 'hsl(var(--text-primary))' }}>
-                Malote Lançado com Sucesso!
+                {successResult.total_orders_created > 1 ? 'Malote Lançado com Sucesso!' : 'OS Registrada com Sucesso!'}
               </h3>
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'hsl(var(--text-secondary))' }}>
                 Foram geradas <strong>{successResult.total_orders_created} Ordens de Serviço</strong> para a ótica <strong>{successResult.optical_store_name}</strong>.
@@ -468,7 +467,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 onClick={handleResetForm}
                 style={{ padding: '10px 18px', fontWeight: 600 }}
               >
-                Lançar Outro Malote
+                {successResult.total_orders_created > 1 ? 'Lançar Outro Malote' : 'Registrar Nova OS'}
               </button>
 
               {onNavigateToWorkflow && (
@@ -532,27 +531,29 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
               )}
             </div>
 
-            {/* Referência do Malote */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '6px' }}>
-                <Package size={15} style={{ color: 'hsl(var(--primary))' }} />
-                Identificador / Ref. do Malote
-              </label>
-              <input
-                type="text"
-                value={batchRef}
-                onChange={(e) => setBatchRef(e.target.value)}
-                placeholder="Ex: MALOTE-104 / ENTRADA-MANHA"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.9rem',
-                  fontFamily: 'monospace'
-                }}
-              />
-            </div>
+            {/* Referência do Malote — exibida somente quando há mais de 1 item no lote */}
+            {rows.length > 1 && (
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: 'hsl(var(--text-primary))', marginBottom: '6px' }}>
+                  <Package size={15} style={{ color: 'hsl(var(--primary))' }} />
+                  Identificador / Ref. do Malote
+                </label>
+                <input
+                  type="text"
+                  value={batchRef}
+                  onChange={(e) => setBatchRef(e.target.value)}
+                  placeholder="Ex: MALOTE-104 / ENTRADA-MANHA"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    fontFamily: 'monospace'
+                  }}
+                />
+              </div>
+            )}
 
           </div>
         </div>
@@ -1273,7 +1274,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                 <span style={{ color: '#64748b' }}>Lentes:</span> <strong>{totalLenses} un</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b' }}>Total do Malote:</span> <strong style={{ color: 'hsl(var(--primary))', fontSize: '1.2rem', marginLeft: '4px' }}>R$ {totalBatchPrice.toFixed(2)}</strong>
+                <span style={{ color: '#64748b' }}>{totalOrders > 1 ? 'Total do Malote:' : 'Total:'}</span> <strong style={{ color: 'hsl(var(--primary))', fontSize: '1.2rem', marginLeft: '4px' }}>R$ {totalBatchPrice.toFixed(2)}</strong>
               </div>
             </div>
 
@@ -1294,11 +1295,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
             >
               {submitting ? (
                 <>
-                  <RefreshCw size={18} className="spin" /> Processando Malote...
+                  <RefreshCw size={18} className="spin" /> {totalOrders > 1 ? 'Processando Malote...' : 'Registrando OS...'}
                 </>
               ) : (
                 <>
-                  <Send size={18} /> Lançar Malote no Laboratório ({totalOrders} Pedidos)
+                  <Send size={18} /> {totalOrders > 1 ? `Lançar Malote no Laboratório (${totalOrders} Pedidos)` : 'Registrar OS no Laboratório'}
                 </>
               )}
             </button>
