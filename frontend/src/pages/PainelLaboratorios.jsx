@@ -2198,8 +2198,8 @@ export default function PainelLaboratorios({
                   type="button"
                   onClick={() => {
                     setNewBroadcastForm({
-                      title: 'Novidades no Sistema: Mais Agilidade nos Seus Pedidos',
-                      message: 'Liberamos melhorias importantes na plataforma: 1. Entrada Rápida por Malote (cadastro ágil de múltiplos pedidos no mesmo lote); 2. Seleção direta do Modelo de Lente por Matriz; 3. Bancada Ágil em 2 etapas com maior velocidade de produção; 4. Visualização otimizada das ordens do dia; 5. Espelho de fatura limpo e transparente com o número do seu pedido de loja destacado.',
+                      title: 'Novas Atualizações no Sistema: Registro de OS Unificado, OS Somente Serviço e Mais Agilidade',
+                      message: 'Olá! Liberamos um novo pacote de melhorias para deixar a rotina do seu laboratório ainda mais rápida, organizada e segura:\n\n1. Novo fluxo unificado "Registrar OS": lance um ou vários pedidos da mesma ótica de uma só vez (com atalho Alt + N).\n2. OS "Somente Serviço (Sem Lente)": abra ordens exclusivas de montagem ou reparo sem vincular lentes e sem baixar estoque.\n3. Mais precisão nas lentes e estoque: busca rápida de modelos, campos automáticos de Base e Adição (aceitando ponto ou vírgula), seleção de Ambos (Par), OD ou OE em multifocais e indicador em tempo real de saldo disponível.\n4. Preços automáticos e descontos facilitados: cálculo automático a partir do modelo e da tabela de preços da ótica, com Valor Total editável para descontos.\n5. Melhor identificação e controle: opção Com Receita / Sem Receita por OS e campo Identificação Interna / Apelido da ótica (apenas para uso interno, sem aparecer em faturas ou relatórios formais).\n6. Relatório de Produção mais completo e sistema mais rápido: exibição direta de Marca, Modelo, Tratamento e Graus (OD/OE) e carregamento muito mais leve.',
                       type: 'info'
                     });
                     setShowNewBroadcastModal(true);
