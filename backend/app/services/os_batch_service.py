@@ -21,6 +21,7 @@ GRADE_MAP = {
     "MF_ACB": "Multifocal Acabado",
     "MF_BLOCO": "Multifocal",
     "BLOCO_VS": "Bloco Visão Simples",
+    "SOMENTE_SERVICO": "Somente Serviço",
 }
 
 DEFAULT_GRADE_PRICES = {
@@ -88,31 +89,45 @@ class OSBatchService:
                     os_number = f"{os_number}-{len(used_os_numbers) + 1}"
             used_os_numbers.add(os_number)
             mt_key = (item_in.matrix_type or "LP_GRADE").upper()
-            grade_label = GRADE_MAP.get(mt_key, "Visão Simples")
+            is_service_only = (
+                (item_in.os_type or "PADRAO").strip().upper() == "REPARO_SERVICO"
+                or mt_key == "SOMENTE_SERVICO"
+            )
+            grade_label = "Somente Serviço" if is_service_only else GRADE_MAP.get(mt_key, "Visão Simples")
 
-            # Localiza modelo de lente
+            # Localiza modelo de lente (somente para OS padrão com lente)
             chosen_model: Optional[LensModel] = None
-            if item_in.lens_model_id:
-                chosen_model = next((m for m in available_models if m.id == item_in.lens_model_id), None)
-            if not chosen_model:
-                chosen_model = models_by_matrix.get(mt_key) or (available_models[0] if available_models else None)
+            if not is_service_only:
+                if item_in.lens_model_id:
+                    chosen_model = next((m for m in available_models if m.id == item_in.lens_model_id), None)
+                if not chosen_model:
+                    chosen_model = models_by_matrix.get(mt_key) or (available_models[0] if available_models else None)
 
-            # Alvo da baixa (Ambos os olhos / Somente OD / Somente OE)
-            eye_target = (item_in.eye_target or "OD_OE").strip().upper()
-            if eye_target not in ("OD_OE", "OD", "OE"):
-                eye_target = "OD_OE"
-            has_od = eye_target in ("OD_OE", "OD")
-            has_oe = eye_target in ("OD_OE", "OE")
-            lens_qty = 2 if eye_target == "OD_OE" else 1
+            # Alvo da baixa (Ambos os olhos / Somente OD / Somente OE — zero para Somente Serviço)
+            if is_service_only:
+                eye_target = "NONE"
+                has_od = False
+                has_oe = False
+                lens_qty = 0
+            else:
+                eye_target = (item_in.eye_target or "OD_OE").strip().upper()
+                if eye_target not in ("OD_OE", "OD", "OE"):
+                    eye_target = "OD_OE"
+                has_od = eye_target in ("OD_OE", "OD")
+                has_oe = eye_target in ("OD_OE", "OE")
+                lens_qty = 2 if eye_target == "OD_OE" else 1
 
-            # Cálculo de preços (sale_price é unitário; par = 2x, olho único = 1x)
-            base_lens_price = item_in.lens_price
-            if base_lens_price is None or base_lens_price < 0:
-                unit_p = float(chosen_model.sale_price) if chosen_model and chosen_model.sale_price else (DEFAULT_GRADE_PRICES.get(mt_key, 67.0) / 2.0)
-                base_lens_price = round(unit_p * lens_qty, 2)
+            # Cálculo de preços (sale_price é unitário; par = 2x, olho único = 1x; somente serviço = 0 lente)
+            if is_service_only:
+                base_lens_price = 0.0
+            else:
+                base_lens_price = item_in.lens_price
+                if base_lens_price is None or base_lens_price < 0:
+                    unit_p = float(chosen_model.sale_price) if chosen_model and chosen_model.sale_price else (DEFAULT_GRADE_PRICES.get(mt_key, 67.0) / 2.0)
+                    base_lens_price = round(unit_p * lens_qty, 2)
 
             serv_price = float(item_in.service_price or 0.0)
-            treat_price = float(item_in.treatment_price or 0.0)
+            treat_price = 0.0 if is_service_only else float(item_in.treatment_price or 0.0)
             calculated_total = round(base_lens_price + serv_price + treat_price, 2)
 
             if item_in.total_amount is not None and item_in.total_amount >= 0:
@@ -127,9 +142,10 @@ class OSBatchService:
                 "OD_OE": "Ambos os Olhos (OD + OE)",
                 "OD": "Somente Olho Direito (OD)",
                 "OE": "Somente Olho Esquerdo (OE)",
+                "NONE": "Somente Serviço (Sem Lente)",
             }
             eye_tag = f"[Baixa: {eye_label_map[eye_target]} | Qtd: {lens_qty} un]"
-            rx_tag = "[Com Receita]" if item_in.has_prescription else "[Sem Receita]"
+            rx_tag = "[Somente Serviço]" if is_service_only else ("[Com Receita]" if item_in.has_prescription else "[Sem Receita]")
             serv_tag = f"[Serviço: {item_in.service_type or 'Montagem Padrão'}]"
             instructions = item_in.special_instructions or f"Entrada Lote Malote: {batch_ref}"
             for tag in (serv_tag, eye_tag, rx_tag):
@@ -146,7 +162,7 @@ class OSBatchService:
                 client_name=item_in.client_name or "Consumidor Final",
                 tray_number=item_in.tray_number or item_in.client_order_number,
                 status=init_status_val,
-                os_type="PADRAO",
+                os_type="REPARO_SERVICO" if is_service_only else "PADRAO",
                 priority="NORMAL",
                 lens_model_id=chosen_model.id if chosen_model else None,
                 
@@ -173,11 +189,11 @@ class OSBatchService:
             db.add(new_os)
             await db.flush()
 
-            # 3. Baixa Automática de Estoque (se solicitada) respeitando eye_target (OD_OE, OD ou OE)
+            # 3. Baixa Automática de Estoque (se solicitada e não for Somente Serviço)
             deducted = False
             inv_warning = None
 
-            if payload.auto_deduct_inventory and chosen_model:
+            if not is_service_only and payload.auto_deduct_inventory and chosen_model:
                 rx_data_prepared: Dict[str, Any] = {}
                 if has_od:
                     rx_data_prepared["OD"] = {
@@ -205,8 +221,8 @@ class OSBatchService:
                     inv_warning = str(alloc_err)
 
             # 4. Gravação dos itens da OS para faturamento e Anexo 1
-            # Item da Lente
-            if chosen_model and base_lens_price > 0:
+            # Item da Lente (somente se não for Somente Serviço)
+            if not is_service_only and chosen_model and base_lens_price > 0 and lens_qty > 0:
                 unit_lens_p = round(base_lens_price / float(lens_qty), 2)
                 db.add(ServiceOrderItem(
                     id=uuid.uuid4(),
@@ -220,22 +236,23 @@ class OSBatchService:
                     created_at=datetime.now(timezone.utc)
                 ))
 
-            # Item de Serviço de Montagem
-            if serv_price > 0:
+            # Item de Serviço de Montagem / Reparo
+            service_item_total = os_total if is_service_only else serv_price
+            if service_item_total > 0:
                 db.add(ServiceOrderItem(
                     id=uuid.uuid4(),
                     service_order_id=new_os.id,
                     entity_type="service",
                     entity_id=uuid.uuid4(), # ID virtual de serviço
                     quantity=1,
-                    unit_price=Decimal(str(serv_price)),
-                    total_price=Decimal(str(serv_price)),
-                    custom_price_applied=False,
+                    unit_price=Decimal(str(service_item_total)),
+                    total_price=Decimal(str(service_item_total)),
+                    custom_price_applied=is_custom_price if is_service_only else False,
                     created_at=datetime.now(timezone.utc)
                 ))
 
             # Item de Tratamento
-            if treat_price > 0 and item_in.treatment and "Incolor" not in item_in.treatment:
+            if not is_service_only and treat_price > 0 and item_in.treatment and "Incolor" not in item_in.treatment:
                 db.add(ServiceOrderItem(
                     id=uuid.uuid4(),
                     service_order_id=new_os.id,
@@ -250,7 +267,9 @@ class OSBatchService:
 
             # 5. Histórico do Workflow
             note = f"Entrada em Lote / Malote ({batch_ref})."
-            if deducted:
+            if is_service_only:
+                note += f" OS Somente Serviço ({item_in.service_type or 'Serviço Técnico'}). Sem baixa de lentes."
+            elif deducted:
                 note += f" Baixa de estoque de lentes ({eye_label_map[eye_target]}) realizada com sucesso."
             elif inv_warning:
                 note += f" Alerta de estoque: {inv_warning}"
@@ -275,7 +294,7 @@ class OSBatchService:
                 status=new_os.status,
                 total_amount=os_total,
                 grade_name=grade_label,
-                lens_model_name=(f"{chosen_model.brand} - {chosen_model.name}") if (chosen_model and chosen_model.name) else (chosen_model.brand if chosen_model else grade_label),
+                lens_model_name=(item_in.service_type or "Serviço Técnico") if is_service_only else ((f"{chosen_model.brand} - {chosen_model.name}") if (chosen_model and chosen_model.name) else (chosen_model.brand if chosen_model else grade_label)),
                 inventory_deducted=deducted,
                 inventory_warning=inv_warning
             ))

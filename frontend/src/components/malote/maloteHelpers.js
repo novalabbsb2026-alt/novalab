@@ -4,6 +4,7 @@ export const MATRIX_OPTIONS = [
   { value: 'MF_ACB', label: 'Multifocal Acabado', unitPrice: 42.5 },
   { value: 'MF_BLOCO', label: 'Multifocal', unitPrice: 47.5 },
   { value: 'BLOCO_VS', label: 'Bloco Visão Simples', unitPrice: 37.5 },
+  { value: 'SOMENTE_SERVICO', label: 'Somente Serviço (Sem Lente)', unitPrice: 0.0 },
 ];
 
 export const EYE_TARGET_OPTIONS = [

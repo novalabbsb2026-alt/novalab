@@ -148,8 +148,9 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
       const pricingFields = ['matrix_type', 'lens_model_id', 'eye_target', 'service_type'];
 
-      // Se mudou a matriz, limpa o modelo e o valor até que o operador selecione a lente desejada
+      // Se mudou a matriz, limpa o modelo; se for Somente Serviço, preenche o valor do serviço técnico
       if (field === 'matrix_type') {
+        const isServiceOnlyNext = value === 'SOMENTE_SERVICO';
         const isMultifocalNext = value === 'MF_ACB' || value === 'MF_BLOCO';
         if (!isMultifocalNext) {
           updated.eye_target = 'OD_OE';
@@ -157,8 +158,19 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         updated.lens_model_id = '';
         updated.lens_unit_price = 0;
         updated.lens_price = 0;
-        updated.total_amount = '';
         updated.is_manual_total = false;
+
+        if (isServiceOnlyNext) {
+          // Garante um serviço real selecionado (não "Sem Montagem")
+          if (!updated.service_type || updated.service_type.includes('Sem Montagem')) {
+            const firstRealService = SERVICE_OPTIONS[0];
+            updated.service_type = firstRealService.value;
+            updated.service_price = firstRealService.price;
+          }
+          updated.total_amount = Math.round(parseFloat(updated.service_price || 0) * 100) / 100;
+        } else {
+          updated.total_amount = '';
+        }
         return updated;
       }
 
@@ -186,9 +198,15 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         }
       }
 
-      // Recalcula automaticamente o valor do par (2x) ou olho único (1x) + serviço somente se houver lente selecionada
+      // Recalcula automaticamente: para Somente Serviço usa só o preço do serviço; para Lentes exige modelo selecionado
       if (pricingFields.includes(field)) {
-        if (!updated.lens_model_id) {
+        if (updated.matrix_type === 'SOMENTE_SERVICO') {
+          const sPrice = parseFloat(updated.service_price || 0);
+          updated.lens_price = 0;
+          updated.treatment_price = 0.0;
+          updated.total_amount = Math.round(sPrice * 100) / 100;
+          updated.is_manual_total = false;
+        } else if (!updated.lens_model_id) {
           updated.lens_price = 0;
           updated.total_amount = '';
           updated.is_manual_total = false;
@@ -235,7 +253,10 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
   // Totais consolidados do malote
   const totalOrders = rows.length;
-  const totalLenses = rows.reduce((acc, r) => acc + ((r.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1), 0);
+  const totalLenses = rows.reduce((acc, r) => {
+    if (r.matrix_type === 'SOMENTE_SERVICO') return acc;
+    return acc + ((r.eye_target || 'OD_OE') === 'OD_OE' ? 2 : 1);
+  }, 0);
   const totalBatchPrice = rows.reduce((acc, r) => acc + parseDiopter(r.total_amount), 0);
 
   // Envio do Lote
@@ -261,29 +282,31 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         initial_status: "EM_PRODUCAO",
         auto_deduct_inventory: true,
         items: rows.map(r => {
+          const isServiceOnlyRow = r.matrix_type === 'SOMENTE_SERVICO';
           const isMultifocalRow = r.matrix_type === 'MF_ACB' || r.matrix_type === 'MF_BLOCO';
-          const selectedModel = lensModels.find(m => m.id === r.lens_model_id);
+          const selectedModel = isServiceOnlyRow ? null : lensModels.find(m => m.id === r.lens_model_id);
           return {
             client_order_number: r.client_order_number?.trim() || null,
             client_name: "Consumidor Final",
             tray_number: r.tray_number?.trim() || null,
             matrix_type: r.matrix_type,
-            lens_model_id: r.lens_model_id || null,
-            eye_target: isMultifocalRow ? (r.eye_target || 'OD_OE') : 'OD_OE',
-            has_prescription: r.has_prescription !== false,
-            od_spherical: parseDiopter(r.od_spherical),
-            od_cylindrical: parseDiopter(r.od_cylindrical),
-            od_axis: Math.min(180, Math.max(0, parseInt(r.od_axis, 10) || 0)),
-            od_addition: Math.abs(parseDiopter(r.od_addition)),
-            od_base_curve: Math.abs(parseDiopter(r.od_base_curve)),
-            oe_spherical: parseDiopter(r.oe_spherical),
-            oe_cylindrical: parseDiopter(r.oe_cylindrical),
-            oe_axis: Math.min(180, Math.max(0, parseInt(r.oe_axis, 10) || 0)),
-            oe_addition: Math.abs(parseDiopter(r.oe_addition)),
-            oe_base_curve: Math.abs(parseDiopter(r.oe_base_curve)),
+            os_type: isServiceOnlyRow ? 'REPARO_SERVICO' : 'PADRAO',
+            lens_model_id: isServiceOnlyRow ? null : (r.lens_model_id || null),
+            eye_target: isServiceOnlyRow ? 'NONE' : (isMultifocalRow ? (r.eye_target || 'OD_OE') : 'OD_OE'),
+            has_prescription: isServiceOnlyRow ? false : (r.has_prescription !== false),
+            od_spherical: isServiceOnlyRow ? 0.0 : parseDiopter(r.od_spherical),
+            od_cylindrical: isServiceOnlyRow ? 0.0 : parseDiopter(r.od_cylindrical),
+            od_axis: isServiceOnlyRow ? 0 : Math.min(180, Math.max(0, parseInt(r.od_axis, 10) || 0)),
+            od_addition: isServiceOnlyRow ? 0.0 : Math.abs(parseDiopter(r.od_addition)),
+            od_base_curve: isServiceOnlyRow ? 0.0 : Math.abs(parseDiopter(r.od_base_curve)),
+            oe_spherical: isServiceOnlyRow ? 0.0 : parseDiopter(r.oe_spherical),
+            oe_cylindrical: isServiceOnlyRow ? 0.0 : parseDiopter(r.oe_cylindrical),
+            oe_axis: isServiceOnlyRow ? 0 : Math.min(180, Math.max(0, parseInt(r.oe_axis, 10) || 0)),
+            oe_addition: isServiceOnlyRow ? 0.0 : Math.abs(parseDiopter(r.oe_addition)),
+            oe_base_curve: isServiceOnlyRow ? 0.0 : Math.abs(parseDiopter(r.oe_base_curve)),
             service_type: r.service_type,
-            treatment: selectedModel?.treatment || r.treatment || 'Incolor / Sem Tratamento',
-            lens_price: parseDiopter(r.lens_price),
+            treatment: isServiceOnlyRow ? 'Sem Lente' : (selectedModel?.treatment || r.treatment || 'Incolor / Sem Tratamento'),
+            lens_price: isServiceOnlyRow ? 0.0 : parseDiopter(r.lens_price),
             service_price: parseDiopter(r.service_price),
             treatment_price: 0.0,
             total_amount: parseDiopter(r.total_amount),
@@ -415,7 +438,11 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                         )}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        {res.inventory_deducted ? (
+                        {res.grade_name === 'Somente Serviço' ? (
+                          <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 600 }}>
+                            Sem lente
+                          </span>
+                        ) : res.inventory_deducted ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669', fontSize: '0.75rem', fontWeight: 700 }}>
                             <Check size={13} /> Baixado
                           </span>
@@ -552,16 +579,20 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
         {/* LISTA DE PEDIDOS / CARDS MODULARES (LAYOUT TOTALMENTE VISÍVEL E ESPAÇOSO) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
           {rows.map((row, idx) => {
+            const isServiceOnly = row.matrix_type === 'SOMENTE_SERVICO';
             const isMF = row.matrix_type === 'MF_ACB' || row.matrix_type === 'MF_BLOCO';
             const isBlocoVS = row.matrix_type === 'BLOCO_VS';
             const needsBaseCurve = isBlocoVS || isMF;
             const needsAddition = isMF;
             const eyeTarget = isMF ? (row.eye_target || 'OD_OE') : 'OD_OE';
             const hasPrescription = row.has_prescription !== false;
-            const showOD = eyeTarget === 'OD_OE' || eyeTarget === 'OD';
-            const showOE = eyeTarget === 'OD_OE' || eyeTarget === 'OE';
+            const showOD = !isServiceOnly && (eyeTarget === 'OD_OE' || eyeTarget === 'OD');
+            const showOE = !isServiceOnly && (eyeTarget === 'OD_OE' || eyeTarget === 'OE');
             const fieldCount = 3 + (needsBaseCurve ? 1 : 0) + (needsAddition ? 1 : 0);
-            const modelsInMatrix = lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (row.matrix_type || 'LP_GRADE').trim().toUpperCase());
+            const modelsInMatrix = isServiceOnly ? [] : lensModels.filter(m => (m.matrix_type || 'LP_GRADE').trim().toUpperCase() === (row.matrix_type || 'LP_GRADE').trim().toUpperCase());
+            const availableServiceOptions = isServiceOnly
+              ? SERVICE_OPTIONS.filter(s => !s.value.includes('Sem Montagem'))
+              : SERVICE_OPTIONS;
             const modelGrid = row.lens_model_id ? inventoryByModel[row.lens_model_id] : null;
             const odStock = modelGrid
               ? checkEyeInventoryBalance(modelGrid, row.matrix_type, 'OD', {
@@ -670,24 +701,41 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                     </select>
                   </div>
 
-                  {/* Modelo de Lente com Busca (Combobox) */}
+                  {/* Modelo de Lente com Busca (Combobox) ou indicador de Somente Serviço */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
                       <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'hsl(var(--text-primary))' }}>
-                        Modelo de Lente *
+                        {isServiceOnly ? 'Lente' : 'Modelo de Lente *'}
                       </label>
-                      {modelsInMatrix.length > 0 && (
+                      {!isServiceOnly && modelsInMatrix.length > 0 && (
                         <span style={{ fontSize: '0.66rem', color: '#059669', fontWeight: 700, background: 'rgba(16, 185, 129, 0.1)', padding: '1px 5px', borderRadius: '4px' }}>
                           {modelsInMatrix.length} disp.
                         </span>
                       )}
                     </div>
-                    <LensModelCombobox
-                      models={modelsInMatrix}
-                      value={row.lens_model_id || ''}
-                      onChange={(newId) => handleRowChange(row.id, 'lens_model_id', newId)}
-                      resolveUnitPrice={resolveLensUnitPrice}
-                    />
+                    {isServiceOnly ? (
+                      <div style={{
+                        height: '38px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        border: '1px dashed #94a3b8',
+                        background: '#f8fafc',
+                        color: '#475569',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}>
+                        Sem lente (apenas serviço técnico)
+                      </div>
+                    ) : (
+                      <LensModelCombobox
+                        models={modelsInMatrix}
+                        value={row.lens_model_id || ''}
+                        onChange={(newId) => handleRowChange(row.id, 'lens_model_id', newId)}
+                        resolveUnitPrice={resolveLensUnitPrice}
+                      />
+                    )}
                   </div>
 
                   {/* Serviço Técnico */}
@@ -700,7 +748,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                       onChange={(e) => handleRowChange(row.id, 'service_type', e.target.value)}
                       style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
                     >
-                      {SERVICE_OPTIONS.map(s => (
+                      {availableServiceOptions.map(s => (
                         <option key={s.value} value={s.value}>{s.label}</option>
                       ))}
                     </select>
@@ -768,7 +816,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#64748b' }}>
-                          {eyeTarget === 'OD_OE' ? 'Par' : '1 un'}
+                          {isServiceOnly ? 'Serviço' : (eyeTarget === 'OD_OE' ? 'Par' : '1 un')}
                         </span>
                       )}
                     </div>
@@ -848,7 +896,39 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
 
                 </div>
 
-                {/* Linha 2: Seletor de Olho (somente Multifocal / MF Acabado) + Dioptrias OD/OE lado a lado (sempre visíveis) */}
+                {/* Linha 2: Observação do Serviço (quando Somente Serviço) OU Dioptrias OD/OE */}
+                {isServiceOnly ? (
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '10px 14px',
+                    background: '#f8fafc',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    minWidth: '980px'
+                  }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
+                      Descrição / Obs. do Serviço:
+                    </span>
+                    <input
+                      type="text"
+                      value={row.special_instructions}
+                      onChange={(e) => handleRowChange(row.id, 'special_instructions', e.target.value)}
+                      placeholder="Ex: Montagem em armação própria, troca de plaquetas, solda na haste, coloração..."
+                      style={{
+                        flex: 1,
+                        height: '32px',
+                        padding: '0 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.8rem',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+                ) : (
                 <div style={{
                   marginTop: '12px',
                   padding: '12px 14px',
@@ -1152,6 +1232,7 @@ const EntradaMalote = ({ onNavigateToWorkflow }) => {
                   </div>
 
                 </div>
+                )}
 
               </div>
             );

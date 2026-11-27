@@ -172,14 +172,27 @@ async def test_batch_malote_creates_orders_end_to_end():
                     service_type="Sem Montagem (Apenas Lentes)",
                     total_amount=49.0,
                 ),
+                OSBatchItemSchema(
+                    client_order_number="1013",
+                    matrix_type="SOMENTE_SERVICO",
+                    os_type="REPARO_SERVICO",
+                    lens_model_id=None,
+                    service_type="Fio de Nylon (Semi-Aro)",
+                    service_price=18.0,
+                    total_amount=18.0,
+                    special_instructions="Troca de fio de nylon e ajuste",
+                ),
             ],
         )
 
         res = await OSBatchService.create_batch_orders(db=db, payload=payload)
         assert res.success is True
-        assert res.total_orders_created == 2
-        assert res.total_amount == 160.0
-        assert res.results[0].os_number != res.results[1].os_number
+        assert res.total_orders_created == 3
+        assert res.total_amount == 178.0
+        assert len({r.os_number for r in res.results}) == 3
         assert res.results[0].status == "Produção"
+        assert res.results[2].grade_name == "Somente Serviço"
+        assert res.results[2].inventory_deducted is False
+        assert res.results[2].inventory_warning is None
 
     await engine.dispose()
